@@ -49,8 +49,8 @@ type Option func(*Tree)
 // of oversight.
 func WithRestart(maxR int, maxT time.Duration, strategy Strategy) Option {
 	return func(t *Tree) {
-		WithRestartIntensity(maxR, maxT)
-		WithRestartStrategy(strategy)
+		WithRestartIntensity(maxR, maxT)(t)
+		WithRestartStrategy(strategy)(t)
 	}
 }
 
