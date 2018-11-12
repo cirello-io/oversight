@@ -2,18 +2,49 @@ package oversight
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 )
+
+// ErrTooManyFailures means that the supervisor detected that one of the child
+// processes has failed too much and that it decided to fully stop.
+var ErrTooManyFailures = errors.New("too many failures")
+
+type running struct {
+	stop func()
+}
 
 // Tree is the supervisor tree proper.
 type Tree struct {
 	initializeOnce sync.Once
 
-	strategy  func()
+	strategy  Strategy
 	maxR      int
 	maxT      time.Duration
 	processes []childProcess
+
+	mu      sync.Mutex
+	running []*running
+	errors  sync.Map // map of childProcID to procError
+}
+
+type procError struct {
+	mu  sync.Mutex
+	err error
+}
+
+func (p *procError) set(err error) {
+	p.mu.Lock()
+	p.err = err
+	p.mu.Unlock()
+}
+
+func (p *procError) error() error {
+	p.mu.Lock()
+	err := p.err
+	p.mu.Unlock()
+	return err
 }
 
 // Oversight creates and ignites a supervisor tree.
@@ -39,6 +70,14 @@ func (t *Tree) init() {
 
 // Start ignites the supervisor tree.
 func (t *Tree) Start(ctx context.Context) error {
+	t.init()
+	restarter := &restart{
+		intensity: t.maxR,
+		period:    t.maxT,
+	}
+	if restarter.terminate(time.Now()) {
+		return ErrTooManyFailures
+	}
 	return nil
 }
 
