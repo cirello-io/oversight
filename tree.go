@@ -29,6 +29,16 @@ type Tree struct {
 	rootErr   error
 }
 
+// New creates a new oversight (supervisor) tree with the applied options.
+func New(opts ...Option) *Tree {
+	t := &Tree{}
+	t.init()
+	for _, opt := range opts {
+		opt(t)
+	}
+	return t
+}
+
 func (t *Tree) setErr(err error) {
 	t.rootErrMu.Lock()
 	defer t.rootErrMu.Unlock()
@@ -45,11 +55,7 @@ func (t *Tree) err() error {
 
 // Oversight creates and ignites a supervisor tree.
 func Oversight(opts ...Option) ChildProcess {
-	t := &Tree{}
-	t.init()
-	for _, opt := range opts {
-		opt(t)
-	}
+	t := New(opts...)
 	return t.Start
 }
 
