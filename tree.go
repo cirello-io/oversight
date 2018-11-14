@@ -23,6 +23,7 @@ type Tree struct {
 	maxR      int
 	maxT      time.Duration
 	processes []childProcess
+	states    []state
 
 	mu      sync.Mutex
 	running []*running

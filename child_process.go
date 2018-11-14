@@ -1,6 +1,53 @@
 package oversight
 
-import "context"
+import (
+	"context"
+	"sync"
+)
+
+type state struct {
+	mu    sync.Mutex
+	state string // "" | "running" | "failed" | "done" --- maybe "shutdown"
+	err   error
+	stop  func()
+}
+
+func (r *state) current() state {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return state{
+		state: r.state,
+		err:   r.err,
+		stop:  r.stop,
+	}
+}
+
+func (r *state) setRunning(stop func()) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.state = "running"
+	r.stop = stop
+}
+
+func (r *state) setErr(err error, restart bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.err = err
+	if !restart {
+		r.state = "done"
+	}
+}
+
+func (r *state) setFailed() {
+	r.mu.Lock()
+	if r.state == "done" {
+		r.mu.Unlock()
+		return
+	}
+	r.state = "failed"
+	r.mu.Unlock()
+	r.stop()
+}
 
 type childProcess struct {
 	restart Restart
