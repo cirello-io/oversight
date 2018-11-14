@@ -53,10 +53,7 @@ func DefaultRestartStrategy(t *Tree) {
 func Processes(processes ...ChildProcess) Option {
 	return func(t *Tree) {
 		for _, p := range processes {
-			t.processes = append(t.processes, childProcess{
-				restart: Permanent,
-				f:       p,
-			})
+			Process(Permanent, p)(t)
 		}
 	}
 }
@@ -69,5 +66,6 @@ func Process(restart Restart, process ChildProcess) Option {
 			restart: restart,
 			f:       process,
 		})
+		t.states = append(t.states, state{})
 	}
 }

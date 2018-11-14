@@ -328,3 +328,28 @@ func Test_nestedTree(t *testing.T) {
 		t.Error("subtree did not run")
 	}
 }
+
+func Test_dynamicChild(t *testing.T) {
+	tempExecCount := 0
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var o oversight.Tree
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := o.Start(ctx); err != nil {
+			t.Log(err)
+		}
+	}()
+	// proves that the clockwork waits for the first child process.
+	time.Sleep(1 * time.Second)
+	o.Add(oversight.Temporary, func(context.Context) error {
+		tempExecCount++
+		return nil
+	})
+	wg.Wait()
+	if tempExecCount == 0 {
+		t.Error("dynamic child process did not start")
+	}
+}
