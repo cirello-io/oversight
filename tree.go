@@ -3,6 +3,8 @@ package oversight
 import (
 	"context"
 	"errors"
+	"io/ioutil"
+	"log"
 	"sync"
 	"time"
 )
@@ -36,6 +38,8 @@ type Tree struct {
 
 	rootErrMu sync.Mutex
 	rootErr   error
+
+	logger *log.Logger
 }
 
 // New creates a new oversight (supervisor) tree with the applied options.
@@ -73,6 +77,7 @@ func (t *Tree) init() {
 		if t.strategy == nil {
 			DefaultRestartStrategy(t)
 		}
+		t.logger = log.New(ioutil.Discard, "", 0)
 	})
 }
 
@@ -168,11 +173,14 @@ func (t *Tree) startChildProcess(ctx context.Context, wg *sync.WaitGroup, i int,
 	t.states[i].setRunning(func() {
 		childCancel()
 		childWg.Wait()
+		t.logger.Println("child stopped")
 	})
 	go func(i int, p childProcess) {
 		defer wg.Done()
 		defer childWg.Done()
 		<-startSemaphore
+		t.logger.Println("child started")
+		defer t.logger.Println("child done")
 		err := safeRun(childCtx, p.f)
 		restart := p.restart(err)
 		t.states[i].setErr(err, restart)

@@ -1,9 +1,12 @@
 package oversight_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"log"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -351,5 +354,27 @@ func Test_dynamicChild(t *testing.T) {
 	wg.Wait()
 	if tempExecCount == 0 {
 		t.Error("dynamic child process did not start")
+	}
+}
+
+func Test_customLogger(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var buf bytes.Buffer
+	logger := log.New(&buf, "", 0)
+	oversight.Oversight(
+		oversight.WithLogger(logger),
+		oversight.Processes(
+			func(ctx context.Context) error {
+				cancel()
+				return nil
+			},
+		),
+	)(ctx)
+	content := buf.String()
+	expectedLog := strings.Contains(content, "child started") && strings.Contains(content, "child done")
+	if !expectedLog {
+		t.Log(content)
+		t.Error("the logger did not log the expected lines")
 	}
 }

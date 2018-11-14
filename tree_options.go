@@ -1,6 +1,9 @@
 package oversight
 
-import "time"
+import (
+	"log"
+	"time"
+)
 
 // Option are applied to change the behavior of a Tree.
 type Option func(*Tree)
@@ -67,5 +70,12 @@ func Process(restart Restart, process ChildProcess) Option {
 			f:       process,
 		})
 		t.states = append(t.states, state{})
+	}
+}
+
+// WithLogger plugs a custom logger to the oversight tree.
+func WithLogger(logger *log.Logger) Option {
+	return func(t *Tree) {
+		t.logger = logger
 	}
 }
