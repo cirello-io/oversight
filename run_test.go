@@ -2,9 +2,8 @@ package oversight
 
 import (
 	"context"
+	"errors"
 	"testing"
-
-	"cirello.io/errors"
 )
 
 func Test_safeRun(t *testing.T) {
@@ -20,7 +19,7 @@ func Test_safeRun(t *testing.T) {
 		wantErr bool
 	}{
 		{"happy case", args{context.Background(), func(context.Context) error { return nil }}, false},
-		{"errored case", args{context.Background(), func(context.Context) error { return errors.E("error") }}, true},
+		{"errored case", args{context.Background(), func(context.Context) error { return errors.New("error") }}, true},
 		{"canceledContext case", args{canceledCtx, func(ctx context.Context) error { return ctx.Err() }}, true},
 	}
 	for _, tt := range tests {
