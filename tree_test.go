@@ -162,7 +162,7 @@ func TestTree_treeRestarts(t *testing.T) {
 		badSiblingRuns := 0
 		goodSiblingRuns := 0
 		supervise := oversight.Oversight(
-			oversight.WithRestart(2, 1*time.Second, oversight.OneForOne),
+			oversight.WithSpecification(2, 1*time.Second, oversight.OneForOne),
 			oversight.Process(oversight.Permanent, func(ctx context.Context) error {
 				t.Log("failed process should always restart...")
 				badSiblingRuns++
@@ -198,12 +198,12 @@ func TestTree_treeRestarts(t *testing.T) {
 		}
 	})
 	t.Run("oneForAll", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		badSiblingRuns := 0
 		goodSiblingRuns := 0
 		supervise := oversight.Oversight(
-			oversight.WithRestart(2, 1*time.Second, oversight.OneForAll),
+			oversight.WithSpecification(2, 1*time.Second, oversight.OneForAll),
 			oversight.Process(oversight.Permanent, func(ctx context.Context) error {
 				t.Log("failed process should always restart...")
 				badSiblingRuns++
@@ -221,13 +221,10 @@ func TestTree_treeRestarts(t *testing.T) {
 				return nil
 			}),
 		)
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			supervise(ctx)
-		}()
-		wg.Wait()
+		err := supervise(ctx)
+		if err != nil {
+			t.Error(err)
+		}
 		if ctx.Err() == context.DeadlineExceeded {
 			t.Error("should never reach deadline exceeded")
 		}
@@ -245,7 +242,7 @@ func TestTree_treeRestarts(t *testing.T) {
 		badSiblingRuns := 0
 		goodSiblingRuns := 0
 		supervise := oversight.Oversight(
-			oversight.WithRestart(2, 1*time.Second, oversight.RestForOne),
+			oversight.WithSpecification(2, 1*time.Second, oversight.RestForOne),
 			oversight.Process(oversight.Permanent, func(ctx context.Context) error {
 				t.Log("first sibling should never die")
 				firstSiblingRuns++
@@ -265,6 +262,9 @@ func TestTree_treeRestarts(t *testing.T) {
 			oversight.Process(oversight.Permanent, func(ctx context.Context) error {
 				t.Log("and the younger siblings too")
 				goodSiblingRuns++
+				select {
+				case <-ctx.Done():
+				}
 				return nil
 			}),
 		)

@@ -157,9 +157,9 @@ func (t *Tree) Start(rootCtx context.Context) error {
 // Option are applied to change the behavior of a Tree.
 type Option func(*Tree)
 
-// WithRestart defines a custom restart tolerance and strategy for the instance
-// of oversight.
-func WithRestart(maxR int, maxT time.Duration, strategy Strategy) Option {
+// WithSpecification defines a custom setup to tweak restart tolerance and
+// strategy for the instance of oversight.
+func WithSpecification(maxR int, maxT time.Duration, strategy Strategy) Option {
 	return func(t *Tree) {
 		WithRestartIntensity(maxR, maxT)(t)
 		WithRestartStrategy(strategy)(t)
