@@ -62,13 +62,13 @@ type ChildProcess func(ctx context.Context) error
 type Restart func(error) bool
 
 // Permanent goroutine is always restarted.
-func Permanent(err error) bool { return true }
+func Permanent() Restart { return func(err error) bool { return true } }
 
 // Temporary goroutine is never restarted (not even when the supervisor restart
 // strategy is rest_for_one or one_for_all and a sibling death causes the
 // temporary process to be terminated).
-func Temporary(err error) bool { return false }
+func Temporary() Restart { return func(err error) bool { return false } }
 
 // Transient goroutine is restarted only if it terminates abnormally, that is,
 // with any error.
-func Transient(err error) bool { return err != nil }
+func Transient() Restart { return func(err error) bool { return err != nil } }

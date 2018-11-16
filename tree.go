@@ -18,7 +18,7 @@ var ErrTooManyFailures = errors.New("too many failures")
 var ErrNoChildProcessLeft = errors.New("no child process left")
 
 // Oversight creates and ignites a supervisor tree.
-func Oversight(opts ...Option) ChildProcess {
+func Oversight(opts ...TreeOption) ChildProcess {
 	t := New(opts...)
 	return t.Start
 }
@@ -43,7 +43,7 @@ type Tree struct {
 }
 
 // New creates a new oversight (supervisor) tree with the applied options.
-func New(opts ...Option) *Tree {
+func New(opts ...TreeOption) *Tree {
 	t := &Tree{}
 	t.init()
 	for _, opt := range opts {
@@ -72,10 +72,10 @@ func (t *Tree) init() {
 		defer t.semaphore.Unlock()
 		t.newProcess = make(chan struct{})
 		if t.maxR == 0 && t.maxT == 0 {
-			DefaultRestartIntensity(t)
+			DefaultRestartIntensity()(t)
 		}
 		if t.strategy == nil {
-			DefaultRestartStrategy(t)
+			DefaultRestartStrategy()(t)
 		}
 		t.logger = log.New(ioutil.Discard, "", 0)
 	})

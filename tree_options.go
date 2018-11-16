@@ -5,12 +5,12 @@ import (
 	"time"
 )
 
-// Option are applied to change the behavior of a Tree.
-type Option func(*Tree)
+// TreeOption are applied to change the behavior of a Tree.
+type TreeOption func(*Tree)
 
 // WithSpecification defines a custom setup to tweak restart tolerance and
 // strategy for the instance of oversight.
-func WithSpecification(maxR int, maxT time.Duration, strategy Strategy) Option {
+func WithSpecification(maxR int, maxT time.Duration, strategy Strategy) TreeOption {
 	return func(t *Tree) {
 		WithRestartIntensity(maxR, maxT)(t)
 		WithRestartStrategy(strategy)(t)
@@ -19,7 +19,7 @@ func WithSpecification(maxR int, maxT time.Duration, strategy Strategy) Option {
 
 // WithRestartIntensity defines a custom tolerance for failures in the
 // supervisor tree.
-func WithRestartIntensity(maxR int, maxT time.Duration) Option {
+func WithRestartIntensity(maxR int, maxT time.Duration) TreeOption {
 	return func(t *Tree) {
 		t.maxR, t.maxT = maxR, maxT
 	}
@@ -34,36 +34,40 @@ const (
 // DefaultRestartIntensity redefines the tolerance for failures in the
 // supervisor tree. It defaults to 1 restart (maxR) in the preceding 5 seconds
 // (maxT).
-func DefaultRestartIntensity(t *Tree) {
-	t.maxR, t.maxT = DefaultMaxR, DefaultMaxT
+func DefaultRestartIntensity() TreeOption {
+	return func(t *Tree) {
+		t.maxR, t.maxT = DefaultMaxR, DefaultMaxT
+	}
 }
 
 // WithRestartStrategy defines a custom restart strategy for the supervisor
 // tree.
-func WithRestartStrategy(strategy Strategy) Option {
+func WithRestartStrategy(strategy Strategy) TreeOption {
 	return func(t *Tree) {
 		t.strategy = strategy
 	}
 }
 
 // DefaultRestartStrategy redefines the supervisor behavior to use OneForOne.
-func DefaultRestartStrategy(t *Tree) {
-	t.strategy = OneForOne
+func DefaultRestartStrategy() TreeOption {
+	return func(t *Tree) {
+		t.strategy = OneForOne()
+	}
 }
 
 // Processes plugs one or more Permanent child processes to the supervisor tree.
 // Processes never reset the child process list.
-func Processes(processes ...ChildProcess) Option {
+func Processes(processes ...ChildProcess) TreeOption {
 	return func(t *Tree) {
 		for _, p := range processes {
-			Process(Permanent, p)(t)
+			Process(Permanent(), p)(t)
 		}
 	}
 }
 
 // Process plugs one child processes to the supervisor tree. Process never reset
 // the child process list.
-func Process(restart Restart, process ChildProcess) Option {
+func Process(restart Restart, process ChildProcess) TreeOption {
 	return func(t *Tree) {
 		t.processes = append(t.processes, childProcess{
 			restart: restart,
@@ -74,7 +78,7 @@ func Process(restart Restart, process ChildProcess) Option {
 }
 
 // WithLogger plugs a custom logger to the oversight tree.
-func WithLogger(logger *log.Logger) Option {
+func WithLogger(logger *log.Logger) TreeOption {
 	return func(t *Tree) {
 		t.logger = logger
 	}
