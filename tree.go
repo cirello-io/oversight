@@ -110,6 +110,10 @@ func (t *Tree) Start(rootCtx context.Context) error {
 			select {
 			case <-ctx.Done():
 				t.logger.Printf("context canceled (before start): %v", ctx.Err())
+				t.semaphore.Lock()
+				OneForAll()(t, 0)
+				t.semaphore.Unlock()
+				t.logger.Printf("clean up complete")
 				return
 			default:
 			}
@@ -148,6 +152,10 @@ func (t *Tree) Start(rootCtx context.Context) error {
 			select {
 			case <-ctx.Done():
 				t.logger.Printf("context canceled (after start): %v", ctx.Err())
+				t.semaphore.Lock()
+				OneForAll()(t, 0)
+				t.semaphore.Unlock()
+				t.logger.Printf("clean up complete")
 				return
 			case <-t.newProcess:
 				t.logger.Println("dynamic child process added")
