@@ -3,6 +3,7 @@ package oversight
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"sync"
@@ -32,7 +33,7 @@ type Tree struct {
 	strategy   Strategy
 	maxR       int
 	maxT       time.Duration
-	processes  []childProcess
+	processes  []ChildProcessSpecification
 	states     []state
 	newProcess chan struct{} // indicates a new dynamic process is present
 
@@ -86,7 +87,12 @@ func (t *Tree) Add(restart Restart, f ChildProcess) {
 	t.init()
 	t.semaphore.Lock()
 	t.states = append(t.states, state{})
-	t.processes = append(t.processes, childProcess{restart: restart, f: f})
+	name := fmt.Sprintf("childproc %d", len(t.states))
+	t.processes = append(t.processes, ChildProcessSpecification{
+		Name:    name,
+		Restart: restart,
+		Start:   f,
+	})
 	t.semaphore.Unlock()
 	t.newProcess <- struct{}{}
 }
@@ -127,7 +133,7 @@ func (t *Tree) Start(rootCtx context.Context) error {
 					continue
 				}
 				if running.state == "failed" &&
-					!p.restart(running.err) {
+					!p.Restart(running.err) {
 					continue
 				}
 				anyNewStartedProcess = true
@@ -165,7 +171,7 @@ func (t *Tree) Start(rootCtx context.Context) error {
 }
 
 func (t *Tree) startChildProcess(ctx context.Context, wg *sync.WaitGroup, i int,
-	p childProcess, startSemaphore <-chan struct{}, failure chan int) {
+	p ChildProcessSpecification, startSemaphore <-chan struct{}, failure chan int) {
 	childCtx, childCancel := context.WithCancel(ctx)
 	var childWg sync.WaitGroup
 	wg.Add(1)
@@ -175,14 +181,14 @@ func (t *Tree) startChildProcess(ctx context.Context, wg *sync.WaitGroup, i int,
 		childWg.Wait()
 		t.logger.Println("child stopped")
 	})
-	go func(i int, p childProcess) {
+	go func(i int, p ChildProcessSpecification) {
 		defer wg.Done()
 		defer childWg.Done()
 		<-startSemaphore
 		t.logger.Println("child started")
 		defer t.logger.Println("child done")
-		err := safeRun(childCtx, p.f)
-		restart := p.restart(err)
+		err := safeRun(childCtx, p.Start)
+		restart := p.Restart(err)
 		t.states[i].setErr(err, restart)
 		// TODO(uc): add support for timeout detach
 		select {

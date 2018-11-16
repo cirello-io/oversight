@@ -1,6 +1,7 @@
 package oversight
 
 import (
+	"fmt"
 	"log"
 	"time"
 )
@@ -69,11 +70,13 @@ func Processes(processes ...ChildProcess) TreeOption {
 // the child process list.
 func Process(restart Restart, process ChildProcess) TreeOption {
 	return func(t *Tree) {
-		t.processes = append(t.processes, childProcess{
-			restart: restart,
-			f:       process,
-		})
 		t.states = append(t.states, state{})
+		name := fmt.Sprintf("childproc %d", len(t.states))
+		t.processes = append(t.processes, ChildProcessSpecification{
+			Name:    name,
+			Restart: restart,
+			Start:   process,
+		})
 	}
 }
 
