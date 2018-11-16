@@ -61,22 +61,29 @@ func DefaultRestartStrategy() TreeOption {
 func Processes(processes ...ChildProcess) TreeOption {
 	return func(t *Tree) {
 		for _, p := range processes {
-			Process(Permanent(), p)(t)
+			Process(ChildProcessSpecification{
+				Restart: Permanent(),
+				Start:   p,
+			})(t)
 		}
 	}
 }
 
 // Process plugs one child processes to the supervisor tree. Process never reset
 // the child process list.
-func Process(restart Restart, process ChildProcess) TreeOption {
+func Process(spec ChildProcessSpecification) TreeOption {
 	return func(t *Tree) {
 		t.states = append(t.states, state{})
-		name := fmt.Sprintf("childproc %d", len(t.states))
-		t.processes = append(t.processes, ChildProcessSpecification{
-			Name:    name,
-			Restart: restart,
-			Start:   process,
-		})
+		if spec.Name == "" {
+			spec.Name = fmt.Sprintf("childproc %d", len(t.processes)+1)
+		}
+		if spec.Restart == nil {
+			spec.Restart = Permanent()
+		}
+		if spec.Start == nil {
+			panic("child process must always have a function")
+		}
+		t.processes = append(t.processes, spec)
 	}
 }
 

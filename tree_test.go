@@ -49,17 +49,20 @@ func TestTree_childProcessRestarts(t *testing.T) {
 		const expectedRuns = 2
 		totalRuns := 0
 		supervise := oversight.Oversight(
-			oversight.Process(oversight.Permanent(), func(ctx context.Context) error {
-				select {
-				case <-ctx.Done():
-					return nil
-				default:
-					totalRuns++
-					if totalRuns == expectedRuns {
-						cancel()
+			oversight.Process(oversight.ChildProcessSpecification{
+				Restart: oversight.Permanent(),
+				Start: func(ctx context.Context) error {
+					select {
+					case <-ctx.Done():
+						return nil
+					default:
+						totalRuns++
+						if totalRuns == expectedRuns {
+							cancel()
+						}
 					}
-				}
-				return errors.New("finished")
+					return errors.New("finished")
+				},
 			}),
 		)
 		var wg sync.WaitGroup
@@ -84,21 +87,24 @@ func TestTree_childProcessRestarts(t *testing.T) {
 		const expectedRuns = 2
 		totalRuns := 0
 		supervise := oversight.Oversight(
-			oversight.Process(oversight.Transient(), func(ctx context.Context) error {
-				var err error
-				if totalRuns == 0 {
-					err = errors.New("finished")
-				}
-				select {
-				case <-ctx.Done():
-					return nil
-				default:
-					totalRuns++
-					if totalRuns == expectedRuns {
-						cancel()
+			oversight.Process(oversight.ChildProcessSpecification{
+				Restart: oversight.Transient(),
+				Start: func(ctx context.Context) error {
+					var err error
+					if totalRuns == 0 {
+						err = errors.New("finished")
 					}
-				}
-				return err
+					select {
+					case <-ctx.Done():
+						return nil
+					default:
+						totalRuns++
+						if totalRuns == expectedRuns {
+							cancel()
+						}
+					}
+					return err
+				},
 			}),
 		)
 		var wg sync.WaitGroup
@@ -123,25 +129,31 @@ func TestTree_childProcessRestarts(t *testing.T) {
 		const unexpectedRuns = 2
 		totalRuns := 0
 		supervise := oversight.Oversight(
-			oversight.Process(oversight.Temporary(), func(ctx context.Context) error {
-				var err error
-				if totalRuns == 0 {
-					err = errors.New("finished")
-				}
-				select {
-				case <-ctx.Done():
-					return nil
-				default:
-					totalRuns++
-					t.Log("run:", totalRuns)
-					cancel()
-				}
-				return err
+			oversight.Process(oversight.ChildProcessSpecification{
+				Restart: oversight.Temporary(),
+				Start: func(ctx context.Context) error {
+					var err error
+					if totalRuns == 0 {
+						err = errors.New("finished")
+					}
+					select {
+					case <-ctx.Done():
+						return nil
+					default:
+						totalRuns++
+						t.Log("run:", totalRuns)
+						cancel()
+					}
+					return err
+				},
 			}),
-			oversight.Process(oversight.Permanent(), func(context.Context) error {
-				t.Log("ping...")
-				time.Sleep(500 * time.Millisecond)
-				return nil
+			oversight.Process(oversight.ChildProcessSpecification{
+				Restart: oversight.Permanent(),
+				Start: func(context.Context) error {
+					t.Log("ping...")
+					time.Sleep(500 * time.Millisecond)
+					return nil
+				},
 			}),
 		)
 		var wg sync.WaitGroup
@@ -166,21 +178,27 @@ func TestTree_treeRestarts(t *testing.T) {
 		goodSiblingRuns := 0
 		supervise := oversight.Oversight(
 			oversight.WithSpecification(2, 1*time.Second, oversight.OneForOne()),
-			oversight.Process(oversight.Permanent(), func(ctx context.Context) error {
-				t.Log("failed process should always restart...")
-				badSiblingRuns++
-				if badSiblingRuns >= 2 {
-					cancel()
-				}
-				return errors.New("finished")
+			oversight.Process(oversight.ChildProcessSpecification{
+				Restart: oversight.Permanent(),
+				Start: func(ctx context.Context) error {
+					t.Log("failed process should always restart...")
+					badSiblingRuns++
+					if badSiblingRuns >= 2 {
+						cancel()
+					}
+					return errors.New("finished")
+				},
 			}),
-			oversight.Process(oversight.Permanent(), func(ctx context.Context) error {
-				t.Log("but sibling must stay untouched")
-				goodSiblingRuns++
-				select {
-				case <-ctx.Done():
-				}
-				return nil
+			oversight.Process(oversight.ChildProcessSpecification{
+				Restart: oversight.Permanent(),
+				Start: func(ctx context.Context) error {
+					t.Log("but sibling must stay untouched")
+					goodSiblingRuns++
+					select {
+					case <-ctx.Done():
+					}
+					return nil
+				},
 			}),
 		)
 		var wg sync.WaitGroup
@@ -207,21 +225,27 @@ func TestTree_treeRestarts(t *testing.T) {
 		goodSiblingRuns := 0
 		supervise := oversight.Oversight(
 			oversight.WithSpecification(2, 1*time.Second, oversight.OneForAll()),
-			oversight.Process(oversight.Permanent(), func(ctx context.Context) error {
-				t.Log("failed process should always restart...")
-				badSiblingRuns++
-				if badSiblingRuns >= 2 {
-					cancel()
-				}
-				return errors.New("finished")
+			oversight.Process(oversight.ChildProcessSpecification{
+				Restart: oversight.Permanent(),
+				Start: func(ctx context.Context) error {
+					t.Log("failed process should always restart...")
+					badSiblingRuns++
+					if badSiblingRuns >= 2 {
+						cancel()
+					}
+					return errors.New("finished")
+				},
 			}),
-			oversight.Process(oversight.Permanent(), func(ctx context.Context) error {
-				t.Log("and the sibling must restart too")
-				goodSiblingRuns++
-				select {
-				case <-ctx.Done():
-				}
-				return nil
+			oversight.Process(oversight.ChildProcessSpecification{
+				Restart: oversight.Permanent(),
+				Start: func(ctx context.Context) error {
+					t.Log("and the sibling must restart too")
+					goodSiblingRuns++
+					select {
+					case <-ctx.Done():
+					}
+					return nil
+				},
 			}),
 		)
 		err := supervise(ctx)
@@ -246,30 +270,36 @@ func TestTree_treeRestarts(t *testing.T) {
 		goodSiblingRuns := 0
 		supervise := oversight.Oversight(
 			oversight.WithSpecification(2, 1*time.Second, oversight.RestForOne()),
-			oversight.Process(oversight.Permanent(), func(ctx context.Context) error {
-				t.Log("first sibling should never die")
-				firstSiblingRuns++
-				select {
-				case <-ctx.Done():
-				}
-				return nil
-			}),
-			oversight.Process(oversight.Permanent(), func(ctx context.Context) error {
-				t.Log("failed process should always restart...")
-				badSiblingRuns++
-				if badSiblingRuns >= 2 {
-					cancel()
-				}
-				return errors.New("finished")
-			}),
-			oversight.Process(oversight.Permanent(), func(ctx context.Context) error {
-				t.Log("and the younger siblings too")
-				goodSiblingRuns++
-				select {
-				case <-ctx.Done():
-				}
-				return nil
-			}),
+			oversight.Process(oversight.ChildProcessSpecification{
+				Restart: oversight.Permanent(),
+				Start: func(ctx context.Context) error {
+					t.Log("first sibling should never die")
+					firstSiblingRuns++
+					select {
+					case <-ctx.Done():
+					}
+					return nil
+				}}),
+			oversight.Process(oversight.ChildProcessSpecification{
+				Restart: oversight.Permanent(),
+				Start: func(ctx context.Context) error {
+					t.Log("failed process should always restart...")
+					badSiblingRuns++
+					if badSiblingRuns >= 2 {
+						cancel()
+					}
+					return errors.New("finished")
+				}}),
+			oversight.Process(oversight.ChildProcessSpecification{
+				Restart: oversight.Permanent(),
+				Start: func(ctx context.Context) error {
+					t.Log("and the younger siblings too")
+					goodSiblingRuns++
+					select {
+					case <-ctx.Done():
+					}
+					return nil
+				}}),
 		)
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -347,9 +377,12 @@ func Test_dynamicChild(t *testing.T) {
 	}()
 	// proves that the clockwork waits for the first child process.
 	time.Sleep(1 * time.Second)
-	o.Add(oversight.Temporary(), func(context.Context) error {
-		tempExecCount++
-		return nil
+	o.Add(oversight.ChildProcessSpecification{
+		Restart: oversight.Temporary(),
+		Start: func(context.Context) error {
+			tempExecCount++
+			return nil
+		},
 	})
 	wg.Wait()
 	if tempExecCount == 0 {

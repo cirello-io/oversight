@@ -3,7 +3,6 @@ package oversight
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"sync"
@@ -83,16 +82,10 @@ func (t *Tree) init() {
 }
 
 // Add attaches a new child process to a running oversight tree.
-func (t *Tree) Add(restart Restart, f ChildProcess) {
+func (t *Tree) Add(spec ChildProcessSpecification) {
 	t.init()
 	t.semaphore.Lock()
-	t.states = append(t.states, state{})
-	name := fmt.Sprintf("childproc %d", len(t.states))
-	t.processes = append(t.processes, ChildProcessSpecification{
-		Name:    name,
-		Restart: restart,
-		Start:   f,
-	})
+	Process(spec)(t)
 	t.semaphore.Unlock()
 	t.newProcess <- struct{}{}
 }
