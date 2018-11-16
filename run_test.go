@@ -21,6 +21,7 @@ func Test_safeRun(t *testing.T) {
 		{"happy case", args{context.Background(), func(context.Context) error { return nil }}, false},
 		{"errored case", args{context.Background(), func(context.Context) error { return errors.New("error") }}, true},
 		{"canceledContext case", args{canceledCtx, func(ctx context.Context) error { return ctx.Err() }}, true},
+		{"panic case", args{canceledCtx, func(ctx context.Context) error { panic("panic") }}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
