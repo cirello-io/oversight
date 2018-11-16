@@ -411,3 +411,61 @@ func Test_customLogger(t *testing.T) {
 		t.Error("the logger did not log the expected lines")
 	}
 }
+
+func Test_childProcTimeout(t *testing.T) {
+	blockedCtx, blockedCancel := context.WithCancel(context.Background())
+	defer blockedCancel()
+	started := make(chan struct{})
+	tree := oversight.Oversight(
+		oversight.Process(
+			oversight.ChildProcessSpecification{
+				Name:    "timed out childproc",
+				Restart: oversight.Temporary(),
+				Start: func(ctx context.Context) error {
+					started <- struct{}{}
+					t.Log("started")
+					select {
+					case <-ctx.Done():
+					}
+					t.Log("tree stop signal received")
+					select {
+					case <-blockedCtx.Done():
+					}
+					return nil
+				},
+				Shutdown: oversight.Timeout(2 * time.Second),
+			},
+		),
+	)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer t.Log("tree stopped")
+		err := tree(ctx)
+		if err != nil {
+			t.Log(err)
+		}
+	}()
+	go func() {
+		<-started
+		t.Log("stopping oversight tree")
+		cancel()
+	}()
+
+	completed := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(completed)
+	}()
+
+	select {
+	case <-completed:
+		t.Log("tree has completed")
+	case <-time.After(10 * time.Second):
+		t.Error("tree is not honoring detach timeout")
+	}
+
+}

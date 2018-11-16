@@ -137,8 +137,8 @@ func (t *Tree) Start(rootCtx context.Context) error {
 				anyNewStartedProcess = true
 				anyStartedProcessEver = true
 				t.logger.Printf("starting %v", p.Name)
-				t.startChildProcess(ctx, &wg, i, p,
-					startSemaphore, failure)
+				t.startChildProcess(ctx, i, p, startSemaphore,
+					failure)
 			}
 			close(startSemaphore)
 			t.semaphore.Unlock()
@@ -181,30 +181,56 @@ func (t *Tree) Start(rootCtx context.Context) error {
 	return t.err()
 }
 
-func (t *Tree) startChildProcess(ctx context.Context, wg *sync.WaitGroup, i int,
+func (t *Tree) startChildProcess(ctx context.Context, processID int,
 	p ChildProcessSpecification, startSemaphore <-chan struct{}, failure chan int) {
-	childCtx, childCancel := context.WithCancel(ctx)
-	var childWg sync.WaitGroup
-	wg.Add(1)
-	childWg.Add(1)
-	t.states[i].setRunning(func() {
-		childCancel()
-		childWg.Wait()
-		t.logger.Println(p.Name, "stopped")
-	})
-	go func(i int, p ChildProcessSpecification) {
-		defer wg.Done()
+	childCtx, childWg := t.plugStop(ctx, processID, p)
+	go func(processID int, p ChildProcessSpecification) {
 		defer childWg.Done()
 		<-startSemaphore
 		t.logger.Println(p.Name, "child started")
 		defer t.logger.Println(p.Name, "child done")
 		err := safeRun(childCtx, p.Start)
 		restart := p.Restart(err)
-		t.states[i].setErr(err, restart)
+		t.states[processID].setErr(err, restart)
 		// TODO(uc): add support for timeout detach
 		select {
 		case <-childCtx.Done():
-		case failure <- i:
+		case failure <- processID:
 		}
-	}(i, p)
+	}(processID, p)
+}
+
+func (t *Tree) plugStop(ctx context.Context, processID int, p ChildProcessSpecification) (context.Context, *sync.WaitGroup) {
+	childCtx, childCancel := context.WithCancel(ctx)
+	var childWg sync.WaitGroup
+	childWg.Add(1)
+	stop := func() {
+		t.logger.Println(p.Name, "stopping")
+		childCancel()
+		childWg.Wait()
+		t.logger.Println(p.Name, "stopped")
+	}
+	if p.Shutdown != nil {
+		dur := *p.Shutdown
+		stop = func() {
+			t.logger.Println(p.Name, "stopping")
+			wgComplete := make(chan struct{})
+			childCancel()
+			go func() {
+				childWg.Wait()
+				select {
+				case wgComplete <- struct{}{}:
+				default:
+				}
+			}()
+			select {
+			case <-wgComplete:
+				t.logger.Println(p.Name, "stopped")
+			case <-time.After(dur):
+				t.logger.Println(p.Name, "timeout")
+			}
+		}
+	}
+	t.states[processID].setRunning(stop)
+	return childCtx, &childWg
 }

@@ -3,6 +3,7 @@ package oversight
 import (
 	"context"
 	"sync"
+	"time"
 )
 
 type state struct {
@@ -64,6 +65,13 @@ type ChildProcessSpecification struct {
 	// not circumvent Go's panic-recover semantics. Avoid starting
 	// goroutines inside the ChildProcess if they risk panic()'ing.
 	Start ChildProcess
+
+	// Shutdown defines the child process timeout. If the process is not
+	// stopped within the specified duration, the oversight tree detached
+	// the process and moves on. Null values mean wait forever. Unlike
+	// Erlang, Infinity is the default both for oversight tree and worker
+	// processes.
+	Shutdown Shutdown
 }
 
 // ChildProcess is a function that can be supervised for restart.
@@ -84,3 +92,18 @@ func Temporary() Restart { return func(err error) bool { return false } }
 // Transient goroutine is restarted only if it terminates abnormally, that is,
 // with any error.
 func Transient() Restart { return func(err error) bool { return err != nil } }
+
+// Shutdown defines how the oversight handles child processes hanging after they
+// are signaled to stop.
+type Shutdown *time.Duration
+
+// Infinity will wait until the process naturally dies.
+func Infinity() Shutdown {
+	return nil
+}
+
+// Timeout defines a duration of time that the oversight will wait before
+// detaching from the winding process.
+func Timeout(d time.Duration) Shutdown {
+	return Shutdown(&d)
+}
