@@ -109,6 +109,7 @@ func (t *Tree) Start(rootCtx context.Context) error {
 		for {
 			select {
 			case <-ctx.Done():
+				t.logger.Printf("context canceled (before start): %v", ctx.Err())
 				return
 			default:
 			}
@@ -131,12 +132,14 @@ func (t *Tree) Start(rootCtx context.Context) error {
 				}
 				anyNewStartedProcess = true
 				anyStartedProcessEver = true
+				t.logger.Printf("starting %v", p.Name)
 				t.startChildProcess(ctx, &wg, i, p,
 					startSemaphore, failure)
 			}
 			close(startSemaphore)
 			t.semaphore.Unlock()
 			if !anyNewStartedProcess && anyStartedProcessEver {
+				t.logger.Printf("no child process left after start")
 				t.setErr(ErrNoChildProcessLeft)
 				cancel()
 				return
@@ -144,13 +147,20 @@ func (t *Tree) Start(rootCtx context.Context) error {
 
 			select {
 			case <-ctx.Done():
+				t.logger.Printf("context canceled (after start): %v", ctx.Err())
 				return
 			case <-t.newProcess:
+				t.logger.Println("dynamic child process added")
 			case failedChild := <-failure:
 				t.semaphore.Lock()
+				t.logger.Printf("child process failure detected (%v)", t.processes[failedChild].Name)
 				t.strategy(t, failedChild)
 				t.semaphore.Unlock()
 				if restarter.terminate(time.Now()) {
+					t.logger.Printf("too many failures detected:")
+					for _, restart := range restarter.restarts {
+						t.logger.Println("-", restart)
+					}
 					t.setErr(ErrTooManyFailures)
 					cancel()
 					return
@@ -172,14 +182,14 @@ func (t *Tree) startChildProcess(ctx context.Context, wg *sync.WaitGroup, i int,
 	t.states[i].setRunning(func() {
 		childCancel()
 		childWg.Wait()
-		t.logger.Println("child stopped")
+		t.logger.Println(p.Name, "stopped")
 	})
 	go func(i int, p ChildProcessSpecification) {
 		defer wg.Done()
 		defer childWg.Done()
 		<-startSemaphore
-		t.logger.Println("child started")
-		defer t.logger.Println("child done")
+		t.logger.Println(p.Name, "child started")
+		defer t.logger.Println(p.Name, "child done")
 		err := safeRun(childCtx, p.Start)
 		restart := p.Restart(err)
 		t.states[i].setErr(err, restart)
@@ -188,6 +198,5 @@ func (t *Tree) startChildProcess(ctx context.Context, wg *sync.WaitGroup, i int,
 		case <-childCtx.Done():
 		case failure <- i:
 		}
-
 	}(i, p)
 }
