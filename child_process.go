@@ -8,7 +8,7 @@ import (
 
 type state struct {
 	mu    sync.Mutex
-	state string // "" | "running" | "failed" | "done" --- maybe "shutdown"
+	state string // "" | "running" | "failed" | "done"
 	err   error
 	stop  func()
 }

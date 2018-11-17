@@ -102,6 +102,86 @@ func (t *Tree) Add(spec ChildProcessSpecification) {
 
 // Start ignites the supervisor tree.
 func (t *Tree) Start(rootCtx context.Context) error {
+	/*
+		Theory of operation
+
+		This is not a line-by-line of Erlang's supervisor module because
+		functional programming patterns are not the most efficient
+		idioms for Go programs. I have referred to Erlang's
+		supervisor.erl and its Elixir cousin's supervisor.ex to how this
+		implementation should behave. The design principles document for
+		Erlang outlines a lot of how it works, but leaves significant
+		gaps that only the source code answers.
+
+		This supervisor tree has one loop divided in two phases:
+		1 - differential process start according to the restart definition.
+		2 - failure capture with application of termination strategy.
+
+		The definition of failure and termination strategy will be
+		presented shortly.
+
+		1 - Differential process start
+
+		When the oversight tree is configured, it takes each declared
+		child process and create a state to represent its lifecyle.
+
+		Using the start definition it decides if the process should be
+		either started (when it is the first time), restarted (after
+		failure), or ignored.
+
+		Each started process are hold onto a channel to prevent that a
+		process that fail on start to automatically trigger a tree wide
+		restart. Once all child processes are ready to start, this
+		channel signals that they can run and the second phase starts.
+
+
+		2 - Capture failure and apply termination strategy.
+
+		Each child process is given the access to a channel to notify
+		failures. When one of the child processes fails, the oversight
+		tree applies a failure strategy (one_for_one, one_for_all,
+		rest_for_one, and simple_one_for_one) - that is it terminates
+		all other child processes affected by the strategy.
+
+		It records the termination in the restarter bookkeeper, that
+		decides if the tree has failed too much too soon; if that is the
+		case, the tree terminates its alive child processes and then
+		itself.
+
+
+		Definition of failure (Permanent, Temporary and Transient)
+
+		The definition of failure determines whether the process needs
+		to be restarted once it reached the "failed" state. It is
+		particularly sensitive for Temporary processes, because even
+		when they do fail, the net result is always success. I checked
+		Elixir's implementation and in fact, Temporary child processes
+		are always considered successful whether they fail or not.
+
+		Thus, only Permanent and Transient can fail. Permanent
+		terminations are always considered failure. Transient successes
+		are considered normal terminations and Transient failures are
+		considered failures. Failures triggers tree restarts.
+
+
+		Definition of termination strategy (OneForOne, OneForAll, RestForOne, SimpleOneForOne)
+
+		Termination strategies handle how the oversight tree handle
+		failures. They have the same as they do in Erlang. The
+		difference is that in Erlang you can use brutalKill to terminate
+		a child process. That's not possible in Go. In this
+		implementation, when the child process does not terminate on
+		time, the oversight tree simply detaches the offending goroutine
+		and moves on.
+
+		Blind Spots:
+		- due to panic/recover semantics, child processes that spawn
+		panicky goroutines will never be able to trap these events; it
+		is up to the programmer to make sure that goroutines inside of
+		child processes to never panic.
+		- Goroutines cannot be killed - this implementation relies on
+		contexts cancelations to propagate termination calls.
+	*/
 	t.init()
 	ctx, cancel := context.WithCancel(rootCtx)
 	defer cancel()
