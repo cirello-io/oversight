@@ -192,7 +192,6 @@ func (t *Tree) startChildProcess(ctx context.Context, processID int,
 		err := safeRun(childCtx, p.Start)
 		restart := p.Restart(err)
 		t.states[processID].setErr(err, restart)
-		// TODO(uc): add support for timeout detach
 		select {
 		case <-childCtx.Done():
 		case failure <- processID:
