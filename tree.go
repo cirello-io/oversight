@@ -241,12 +241,6 @@ func (t *Tree) Start(rootCtx context.Context) error {
 
 			select {
 			case <-ctx.Done():
-				t.logger.Printf("context canceled (after start): %v", ctx.Err())
-				t.semaphore.Lock()
-				OneForAll()(t, 0)
-				t.semaphore.Unlock()
-				t.logger.Printf("clean up complete")
-				return
 			case <-t.processChanged:
 				t.logger.Println("detected change in child processes list")
 			case failedChild := <-failure:
@@ -261,7 +255,6 @@ func (t *Tree) Start(rootCtx context.Context) error {
 					}
 					t.setErr(ErrTooManyFailures)
 					cancel()
-					return
 				}
 			}
 		}
