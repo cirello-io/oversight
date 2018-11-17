@@ -1,6 +1,6 @@
 # cirello.io/oversight
 
-![travis-ci](https://api.travis-ci.org/ucirello/oversight.svg?branch=master)
+[![travis-ci](https://api.travis-ci.org/ucirello/oversight.svg?branch=master)](https://travis-ci.org/ucirello/oversight)
 [![GoDoc](https://godoc.org/cirello.io/oversight?status.svg)](https://godoc.org/cirello.io/oversight)
 
 
