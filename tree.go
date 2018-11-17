@@ -204,30 +204,22 @@ func (t *Tree) plugStop(ctx context.Context, processID int, p ChildProcessSpecif
 	childCtx, childCancel := context.WithCancel(ctx)
 	var childWg sync.WaitGroup
 	childWg.Add(1)
-	stop := func() {
+	t.states[processID].setRunning(func() {
 		t.logger.Println(p.Name, "stopping")
+		stopCtx, stopCancel := p.Shutdown()
+		defer stopCancel()
+		wgComplete := make(chan struct{})
 		childCancel()
-		childWg.Wait()
-		t.logger.Println(p.Name, "stopped")
-	}
-	if p.Shutdown != nil {
-		dur := *p.Shutdown
-		stop = func() {
-			t.logger.Println(p.Name, "stopping")
-			wgComplete := make(chan struct{})
-			childCancel()
-			go func() {
-				childWg.Wait()
-				close(wgComplete)
-			}()
-			select {
-			case <-wgComplete:
-				t.logger.Println(p.Name, "stopped")
-			case <-time.After(dur):
-				t.logger.Println(p.Name, "timeout")
-			}
+		go func() {
+			childWg.Wait()
+			close(wgComplete)
+		}()
+		select {
+		case <-wgComplete:
+			t.logger.Println(p.Name, "stopped")
+		case <-stopCtx.Done():
+			t.logger.Println(p.Name, "timeout")
 		}
-	}
-	t.states[processID].setRunning(stop)
+	})
 	return childCtx, &childWg
 }

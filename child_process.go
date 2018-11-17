@@ -95,15 +95,19 @@ func Transient() Restart { return func(err error) bool { return err != nil } }
 
 // Shutdown defines how the oversight handles child processes hanging after they
 // are signaled to stop.
-type Shutdown *time.Duration
+type Shutdown func() (context.Context, context.CancelFunc)
 
 // Infinity will wait until the process naturally dies.
 func Infinity() Shutdown {
-	return nil
+	return func() (context.Context, context.CancelFunc) {
+		return context.WithCancel(context.Background())
+	}
 }
 
 // Timeout defines a duration of time that the oversight will wait before
 // detaching from the winding process.
 func Timeout(d time.Duration) Shutdown {
-	return Shutdown(&d)
+	return func() (context.Context, context.CancelFunc) {
+		return context.WithTimeout(context.Background(), d)
+	}
 }

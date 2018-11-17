@@ -80,6 +80,9 @@ func Process(spec ChildProcessSpecification) TreeOption {
 		if spec.Restart == nil {
 			spec.Restart = Permanent()
 		}
+		if spec.Shutdown == nil {
+			spec.Shutdown = Infinity()
+		}
 		if spec.Start == nil {
 			panic("child process must always have a function")
 		}
