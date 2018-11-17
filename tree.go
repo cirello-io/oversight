@@ -218,10 +218,7 @@ func (t *Tree) plugStop(ctx context.Context, processID int, p ChildProcessSpecif
 			childCancel()
 			go func() {
 				childWg.Wait()
-				select {
-				case wgComplete <- struct{}{}:
-				default:
-				}
+				close(wgComplete)
 			}()
 			select {
 			case <-wgComplete:
