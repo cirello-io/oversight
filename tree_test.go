@@ -324,7 +324,10 @@ func TestTree_treeRestarts(t *testing.T) {
 }
 
 func Test_nestedTree(t *testing.T) {
-	leafCount := 0
+	var (
+		leafMu    sync.Mutex
+		leafCount = 0
+	)
 	leaf := oversight.Oversight(oversight.Processes(
 		func(ctx context.Context) error {
 			for {
@@ -332,12 +335,17 @@ func Test_nestedTree(t *testing.T) {
 				case <-ctx.Done():
 					return nil
 				case <-time.After(500 * time.Millisecond):
+					leafMu.Lock()
 					leafCount++
+					leafMu.Unlock()
 				}
 			}
 		},
 	))
-	rootCount := 0
+	var (
+		rootMu    sync.Mutex
+		rootCount = 0
+	)
 	root := oversight.Oversight(
 		oversight.Processes(
 			leaf,
@@ -346,7 +354,9 @@ func Test_nestedTree(t *testing.T) {
 				case <-ctx.Done():
 					return nil
 				case <-time.After(1 * time.Second):
+					rootMu.Lock()
 					rootCount++
+					rootMu.Unlock()
 				}
 				return nil
 			},
@@ -355,7 +365,13 @@ func Test_nestedTree(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	root(ctx)
-	if leafCount == 0 || rootCount == 0 {
+	leafMu.Lock()
+	lc := leafCount
+	leafMu.Unlock()
+	rootMu.Lock()
+	rc := rootCount
+	rootMu.Unlock()
+	if lc == 0 || rc == 0 {
 		t.Error("tree did not run")
 	} else if leafCount == 0 {
 		t.Error("subtree did not run")
