@@ -73,9 +73,10 @@ func Processes(processes ...ChildProcess) TreeOption {
 // the child process list.
 func Process(spec ChildProcessSpecification) TreeOption {
 	return func(t *Tree) {
+		id := len(t.processes) + 1
 		t.states = append(t.states, state{})
 		if spec.Name == "" {
-			spec.Name = fmt.Sprintf("childproc %d", len(t.processes)+1)
+			spec.Name = fmt.Sprintf("childproc %d", id)
 		}
 		if spec.Restart == nil {
 			spec.Restart = Permanent()
@@ -87,6 +88,7 @@ func Process(spec ChildProcessSpecification) TreeOption {
 			panic("child process must always have a function")
 		}
 		t.processes = append(t.processes, spec)
+		t.processIndex[spec.Name] = id - 1
 	}
 }
 

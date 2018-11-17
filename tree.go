@@ -17,6 +17,14 @@ var ErrTooManyFailures = errors.New("too many failures")
 // and there is no one left to restart.
 var ErrNoChildProcessLeft = errors.New("no child process left")
 
+// ErrUnknownProcess is returned when runtime operations (like delete or
+// terminate) failed because the process is not present.
+var ErrUnknownProcess = errors.New("unknown process")
+
+// ErrProcessNotRunning is returned when caller tries to terminated processes
+// that are not running.
+var ErrProcessNotRunning = errors.New("process not running")
+
 // Oversight creates and ignites a supervisor tree.
 func Oversight(opts ...TreeOption) ChildProcess {
 	t := New(opts...)
@@ -28,13 +36,14 @@ type Tree struct {
 	initializeOnce sync.Once
 
 	// semaphore must be held when adding/deleting dynamic processes
-	semaphore  sync.Mutex
-	strategy   Strategy
-	maxR       int
-	maxT       time.Duration
-	processes  []ChildProcessSpecification
-	states     []state
-	newProcess chan struct{} // indicates a new dynamic process is present
+	semaphore      sync.Mutex
+	strategy       Strategy
+	maxR           int
+	maxT           time.Duration
+	processes      []ChildProcessSpecification
+	states         []state
+	processChanged chan struct{}  // indicates that some change to process slice has been made
+	processIndex   map[string]int // map of ChildProcessSpecification.Name to internal ID
 
 	rootErrMu sync.Mutex
 	rootErr   error
@@ -70,7 +79,7 @@ func (t *Tree) init() {
 	t.initializeOnce.Do(func() {
 		t.semaphore.Lock()
 		defer t.semaphore.Unlock()
-		t.newProcess = make(chan struct{})
+		t.processChanged = make(chan struct{})
 		if t.maxR == 0 && t.maxT == 0 {
 			DefaultRestartIntensity()(t)
 		}
@@ -78,6 +87,7 @@ func (t *Tree) init() {
 			DefaultRestartStrategy()(t)
 		}
 		t.logger = log.New(ioutil.Discard, "", 0)
+		t.processIndex = make(map[string]int)
 	})
 }
 
@@ -87,7 +97,7 @@ func (t *Tree) Add(spec ChildProcessSpecification) {
 	t.semaphore.Lock()
 	Process(spec)(t)
 	t.semaphore.Unlock()
-	t.newProcess <- struct{}{}
+	t.processChanged <- struct{}{}
 }
 
 // Start ignites the supervisor tree.
@@ -157,8 +167,8 @@ func (t *Tree) Start(rootCtx context.Context) error {
 				t.semaphore.Unlock()
 				t.logger.Printf("clean up complete")
 				return
-			case <-t.newProcess:
-				t.logger.Println("dynamic child process added")
+			case <-t.processChanged:
+				t.logger.Println("detected change in child processes list")
 			case failedChild := <-failure:
 				t.semaphore.Lock()
 				t.logger.Printf("child process failure detected (%v)", t.processes[failedChild].Name)
@@ -221,4 +231,30 @@ func (t *Tree) plugStop(ctx context.Context, processID int, p ChildProcessSpecif
 		}
 	})
 	return childCtx, &childWg
+}
+
+// Terminate stop the named process. Terminated child processes do not count
+// as failures in the oversight tree restart policy. If the oversight tree runs
+// out of processes to supervise, it will terminate itself with
+// ErrNoChildProcessLeft.
+func (t *Tree) Terminate(name string) error {
+	t.init()
+	t.semaphore.Lock()
+	defer t.semaphore.Unlock()
+	id, ok := t.processIndex[name]
+	if !ok {
+		return ErrUnknownProcess
+	}
+	t.states[id].mu.Lock()
+	state := t.states[id].state
+	stop := t.states[id].stop
+	if state != "running" || stop == nil {
+		t.states[id].mu.Unlock()
+		return ErrProcessNotRunning
+	}
+	t.states[id].state = "done"
+	t.states[id].mu.Unlock()
+	stop()
+	go func() { t.processChanged <- struct{}{} }()
+	return nil
 }

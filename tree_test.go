@@ -484,3 +484,53 @@ func Test_childProcTimeout(t *testing.T) {
 		t.Error("tree is not honoring detach timeout")
 	}
 }
+
+func Test_terminateChildProc(t *testing.T) {
+	var processTerminated bool
+	processStarted := make(chan struct{})
+	tree := oversight.New(
+		oversight.Process(
+			oversight.ChildProcessSpecification{
+				Restart: oversight.Temporary(),
+				Name:    "alpha",
+				Start: func(ctx context.Context) error {
+					close(processStarted)
+					t.Log("started")
+					defer t.Log("stopped")
+					select {
+					case <-ctx.Done():
+						processTerminated = true
+					}
+					return nil
+				},
+			},
+		),
+	)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var expectedError error
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer t.Log("tree stopped")
+		err := tree.Start(ctx)
+		if err != nil {
+			expectedError = err
+			t.Log(err)
+		}
+	}()
+	<-processStarted
+	if err := tree.Terminate("alpha"); err != nil {
+		t.Fatalf("termination call failed: %v", err)
+	}
+	t.Log("alpha terminated")
+	wg.Wait()
+
+	if !processTerminated {
+		t.Error("terminated command did not run")
+	}
+	if expectedError != oversight.ErrNoChildProcessLeft {
+		t.Error("tree should have acknowledged that there was nothing else running")
+	}
+}
