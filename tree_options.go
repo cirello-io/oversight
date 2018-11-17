@@ -81,7 +81,7 @@ func Process(spec ChildProcessSpecification) TreeOption {
 			spec.Restart = Permanent()
 		}
 		if spec.Shutdown == nil {
-			spec.Shutdown = Infinity()
+			spec.Shutdown = Timeout(DefaultChildProcessTimeout)
 		}
 		if spec.Start == nil {
 			panic("child process must always have a function")
@@ -94,5 +94,16 @@ func Process(spec ChildProcessSpecification) TreeOption {
 func WithLogger(logger *log.Logger) TreeOption {
 	return func(t *Tree) {
 		t.logger = logger
+	}
+}
+
+// WithTree is a shortcut to add a tree as a child process.
+func WithTree(subTree *Tree) TreeOption {
+	return func(t *Tree) {
+		Process(ChildProcessSpecification{
+			Restart:  Permanent(),
+			Start:    subTree.Start,
+			Shutdown: Infinity(),
+		})(t)
 	}
 }

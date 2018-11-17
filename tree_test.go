@@ -328,7 +328,7 @@ func Test_nestedTree(t *testing.T) {
 		leafMu    sync.Mutex
 		leafCount = 0
 	)
-	leaf := oversight.Oversight(oversight.Processes(
+	leaf := oversight.New(oversight.Processes(
 		func(ctx context.Context) error {
 			for {
 				select {
@@ -347,8 +347,8 @@ func Test_nestedTree(t *testing.T) {
 		rootCount = 0
 	)
 	root := oversight.Oversight(
+		oversight.WithTree(leaf),
 		oversight.Processes(
-			leaf,
 			func(ctx context.Context) error {
 				select {
 				case <-ctx.Done():
@@ -483,5 +483,4 @@ func Test_childProcTimeout(t *testing.T) {
 	case <-time.After(10 * time.Second):
 		t.Error("tree is not honoring detach timeout")
 	}
-
 }

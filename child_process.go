@@ -68,9 +68,7 @@ type ChildProcessSpecification struct {
 
 	// Shutdown defines the child process timeout. If the process is not
 	// stopped within the specified duration, the oversight tree detached
-	// the process and moves on. Null values mean wait forever. Unlike
-	// Erlang, Infinity is the default both for oversight tree and worker
-	// processes.
+	// the process and moves on. Null values mean wait forever.
 	Shutdown Shutdown
 }
 
@@ -103,6 +101,10 @@ func Infinity() Shutdown {
 		return context.WithCancel(context.Background())
 	}
 }
+
+// DefaultChildProcessTimeout defines how long child worker process should wait
+// before detachment.
+const DefaultChildProcessTimeout = 5 * time.Second
 
 // Timeout defines a duration of time that the oversight will wait before
 // detaching from the winding process.
