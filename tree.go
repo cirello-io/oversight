@@ -79,7 +79,7 @@ func (t *Tree) init() {
 	t.initializeOnce.Do(func() {
 		t.semaphore.Lock()
 		defer t.semaphore.Unlock()
-		t.processChanged = make(chan struct{})
+		t.processChanged = make(chan struct{}, 1)
 		if t.maxR == 0 && t.maxT == 0 {
 			DefaultRestartIntensity()(t)
 		}
@@ -199,12 +199,18 @@ func (t *Tree) Start(rootCtx context.Context) error {
 		for {
 			select {
 			case <-ctx.Done():
+				defer t.logger.Printf("clean up complete")
 				t.logger.Printf("context canceled (before start): %v", ctx.Err())
 				t.semaphore.Lock()
 				OneForAll()(t, 0)
 				t.semaphore.Unlock()
-				t.logger.Printf("clean up complete")
-				return
+				for {
+					select {
+					case <-t.processChanged:
+					default:
+						return
+					}
+				}
 			default:
 			}
 
@@ -236,7 +242,6 @@ func (t *Tree) Start(rootCtx context.Context) error {
 				t.logger.Printf("no child process left after start")
 				t.setErr(ErrNoChildProcessLeft)
 				cancel()
-				return
 			}
 
 			select {
@@ -274,7 +279,7 @@ func (t *Tree) startChildProcess(ctx context.Context, processID int,
 		defer t.logger.Println(p.Name, "child done")
 		err := safeRun(childCtx, p.Start)
 		restart := p.Restart(err)
-		t.states[processID].setErr(err, restart)
+		t.setStateError(p.Name, err, restart)
 		select {
 		case <-childCtx.Done():
 		case failure <- processID:
@@ -313,9 +318,9 @@ func (t *Tree) plugStop(ctx context.Context, processID int, p ChildProcessSpecif
 func (t *Tree) Terminate(name string) error {
 	t.init()
 	t.semaphore.Lock()
-	defer t.semaphore.Unlock()
 	id, ok := t.processIndex[name]
 	if !ok {
+		t.semaphore.Unlock()
 		return ErrUnknownProcess
 	}
 	t.states[id].mu.Lock()
@@ -323,11 +328,38 @@ func (t *Tree) Terminate(name string) error {
 	stop := t.states[id].stop
 	if state != "running" || stop == nil {
 		t.states[id].mu.Unlock()
+		t.semaphore.Unlock()
 		return ErrProcessNotRunning
 	}
 	t.states[id].state = "done"
 	t.states[id].mu.Unlock()
+	t.semaphore.Unlock()
 	stop()
-	go func() { t.processChanged <- struct{}{} }()
+	t.logger.Println("Terminate.processChanged start")
+	t.processChanged <- struct{}{}
+	t.logger.Println("Terminate.processChanged end")
+	return nil
+}
+
+func (t *Tree) setStateError(name string, err error, restart bool) {
+	processID := t.processIndex[name]
+	t.states[processID].setErr(err, restart)
+}
+
+// Delete stops the service in the Supervisor tree and remove from it.
+func (t *Tree) Delete(name string) error {
+	t.init()
+	if err := t.Terminate(name); err != nil {
+		return err
+	}
+	t.semaphore.Lock()
+	defer t.semaphore.Unlock()
+	id := t.processIndex[name]
+	t.states = append(t.states[:id], t.states[id+1:]...)
+	t.processes = append(t.processes[:id], t.processes[id+1:]...)
+	t.processIndex = make(map[string]int)
+	for i, p := range t.processes {
+		t.processIndex[p.Name] = i
+	}
 	return nil
 }

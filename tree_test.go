@@ -534,3 +534,56 @@ func Test_terminateChildProc(t *testing.T) {
 		t.Error("tree should have acknowledged that there was nothing else running")
 	}
 }
+
+func Test_deleteChildProc(t *testing.T) {
+	processStarted := make(chan struct{})
+	tree := oversight.New(
+		oversight.Process(oversight.ChildProcessSpecification{
+			Restart: oversight.Temporary(),
+			Name:    "alpha",
+			Start: func(ctx context.Context) error {
+				t.Log("alpha started")
+				defer t.Log("alpha stopped")
+				select {
+				case <-ctx.Done():
+				}
+				return nil
+			},
+		}),
+		oversight.Process(oversight.ChildProcessSpecification{
+			Restart: oversight.Temporary(),
+			Name:    "beta",
+			Start: func(ctx context.Context) error {
+				close(processStarted)
+				t.Log("beta started")
+				defer t.Log("beta stopped")
+				select {
+				case <-ctx.Done():
+				}
+				return nil
+			},
+		}),
+	)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer t.Log("tree stopped")
+		err := tree.Start(ctx)
+		if err != nil {
+			t.Log(err)
+		}
+	}()
+	<-processStarted
+	if err := tree.Delete("alpha"); err != nil {
+		t.Fatalf("deletion call failed: %v", err)
+	}
+	t.Log("alpha deleted")
+	if err := tree.Delete("alpha"); err == nil {
+		t.Error("deletion call should have failed")
+	}
+	cancel()
+	wg.Wait()
+}
