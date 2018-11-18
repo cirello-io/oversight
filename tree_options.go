@@ -81,7 +81,11 @@ func Processes(processes ...ChildProcess) TreeOption {
 func Process(spec ChildProcessSpecification) TreeOption {
 	return func(t *Tree) {
 		id := len(t.processes) + 1
-		t.states = append(t.states, state{})
+		t.states = append(t.states, state{
+			stop: func() {
+				t.logger.Println("stopped before start")
+			},
+		})
 		if spec.Name == "" {
 			spec.Name = fmt.Sprintf("childproc %d", id)
 		}
