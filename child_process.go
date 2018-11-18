@@ -47,7 +47,6 @@ func (r *state) setFailed() {
 	}
 	r.state = "failed"
 	r.mu.Unlock()
-	r.stop()
 }
 
 // ChildProcessSpecification provides the complete interface to configure how

@@ -8,6 +8,7 @@ type Strategy func(t *Tree, failedChildID int)
 func OneForOne() Strategy {
 	return func(t *Tree, failedChildID int) {
 		t.states[failedChildID].setFailed()
+		t.states[failedChildID].stop()
 	}
 }
 
@@ -18,6 +19,7 @@ func OneForAll() Strategy {
 	return func(t *Tree, failedChildID int) {
 		for i := len(t.states) - 1; i >= 0; i-- {
 			t.states[i].setFailed()
+			t.states[i].stop()
 		}
 	}
 }
@@ -30,10 +32,16 @@ func RestForOne() Strategy {
 	return func(t *Tree, failedChildID int) {
 		for i := len(t.states) - 1; i >= failedChildID; i-- {
 			t.states[i].setFailed()
+			t.states[i].stop()
 		}
 	}
 }
 
-// TODO(uc): SimpleOneForOne - it would mean handling the child processes as if they
-// were dynamic child processes. Leaving this to a later point, when support for
-// dynamic child processes is added.
+// SimpleOneForOne behaves similarly to OneForOne but it runs the stop calls
+// asynchronously.
+func SimpleOneForOne() Strategy {
+	return func(t *Tree, failedChildID int) {
+		t.states[failedChildID].setFailed()
+		go t.states[failedChildID].stop()
+	}
+}
