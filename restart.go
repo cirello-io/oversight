@@ -13,6 +13,9 @@ type restart struct {
 }
 
 func (r *restart) terminate(now time.Time) bool {
+	if r.intensity == -1 {
+		return false
+	}
 	restarts := 0
 	for i := len(r.restarts) - 1; i >= 0; i-- {
 		then := r.restarts[i]

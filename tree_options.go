@@ -26,6 +26,13 @@ func WithRestartIntensity(maxR int, maxT time.Duration) TreeOption {
 	}
 }
 
+// NeverHalt will configure the oversight tree to never stop in face of failure.
+func NeverHalt() TreeOption {
+	return func(t *Tree) {
+		t.maxR = -1
+	}
+}
+
 // Default restart intensity expectations.
 const (
 	DefaultMaxR = 1
