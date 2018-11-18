@@ -78,6 +78,9 @@ func Process(spec ChildProcessSpecification) TreeOption {
 		if spec.Name == "" {
 			spec.Name = fmt.Sprintf("childproc %d", id)
 		}
+		if _, ok := t.processIndex[spec.Name]; ok {
+			spec.Name += fmt.Sprint(" ", id)
+		}
 		if spec.Restart == nil {
 			spec.Restart = Permanent()
 		}

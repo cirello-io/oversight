@@ -54,7 +54,8 @@ func (r *state) setFailed() {
 // the child process should behave itself in case of failures.
 type ChildProcessSpecification struct {
 	// Name is the human-friendly reference used for inspecting and
-	// terminating child processes.
+	// terminating child processes. If the same named is used twice, the
+	// oversight tree will append a suffix to make it unique.
 	Name string
 
 	// Restart must be one of the Restart policies. The each oversight tree
