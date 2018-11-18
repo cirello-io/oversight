@@ -6,16 +6,38 @@ import (
 	"time"
 )
 
+// ChildProcessState represents the current lifecycle step of the child process.
+type ChildProcessState string
+
+// Child processes navigate through a sequence of states, that are atomically
+// managed by the oversight tree to decide if child process needs to be started
+// or not.
+//                             ┌─────────────────────┐
+//                             │                     │
+//                             │              ┌────────────┐
+//                             ▼         ┌───▶│   Failed   │
+//    ┌────────────┐    ┌────────────┐   │    └────────────┘
+//    │  Starting  │───▶│  Running   │───┤
+//    └────────────┘    └────────────┘   │    ┌────────────┐
+//                                       └───▶│    Done    │
+//                                            └────────────┘
+const (
+	Starting ChildProcessState = ""
+	Running  ChildProcessState = "running"
+	Failed   ChildProcessState = "failed"
+	Done     ChildProcessState = "done"
+)
+
 // State is a snapshot of the child process current state.
 type State struct {
 	Name  string
-	State string
+	State ChildProcessState
 	Stop  func()
 }
 
 type state struct {
 	mu    sync.Mutex
-	state string // "" | "running" | "failed" | "done"
+	state ChildProcessState
 	err   error
 	stop  func()
 }
@@ -33,7 +55,7 @@ func (r *state) current() state {
 func (r *state) setRunning(stop func()) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.state = "running"
+	r.state = Running
 	r.stop = stop
 }
 
@@ -42,17 +64,17 @@ func (r *state) setErr(err error, restart bool) {
 	defer r.mu.Unlock()
 	r.err = err
 	if !restart {
-		r.state = "done"
+		r.state = Done
 	}
 }
 
 func (r *state) setFailed() {
 	r.mu.Lock()
-	if r.state == "done" {
+	if r.state == Done {
 		r.mu.Unlock()
 		return
 	}
-	r.state = "failed"
+	r.state = Failed
 	r.mu.Unlock()
 }
 
