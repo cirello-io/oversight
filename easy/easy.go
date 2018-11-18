@@ -41,12 +41,12 @@ var (
 	// tree you are referring to.
 	ErrNoTreeAttached = errors.New("no oversight tree attached to context")
 
-	mu          sync.Mutex
-	supervisors map[string]*oversight.Tree // map of name to oversight.Tree
+	mu    sync.Mutex
+	trees map[string]*oversight.Tree // map of name to oversight.Tree
 )
 
 func init() {
-	supervisors = make(map[string]*oversight.Tree)
+	trees = make(map[string]*oversight.Tree)
 }
 
 // Add inserts a supervised function to the attached tree, it launches
@@ -58,10 +58,10 @@ func Add(ctx context.Context, f oversight.ChildProcess) (string, error) {
 		return "", ErrNoTreeAttached
 	}
 	mu.Lock()
-	svr, ok := supervisors[name]
+	svr, ok := trees[name]
 	mu.Unlock()
 	if !ok {
-		panic("supervisor not found")
+		panic("oversight tree not found")
 	}
 	svr.Add(oversight.ChildProcessSpecification{
 		Name:    name,
@@ -71,7 +71,7 @@ func Add(ctx context.Context, f oversight.ChildProcess) (string, error) {
 	return name, nil
 }
 
-// Delete stops and removes the given service from the attached supervisor. If
+// Delete stops and removes the given service from the attached tree. If
 // the context is not correctly prepared, it returns an ErrNoTreeAttached
 // error
 func Delete(ctx context.Context, name string) error {
@@ -80,19 +80,19 @@ func Delete(ctx context.Context, name string) error {
 		return ErrNoTreeAttached
 	}
 	mu.Lock()
-	svr, ok := supervisors[name]
+	svr, ok := trees[name]
 	mu.Unlock()
 	if !ok {
-		panic("supervisor not found")
+		panic("oversight tree not found")
 	}
 	svr.Delete(name)
 	return nil
 }
 
-// WithContext takes a context and prepare it to be used by easy supervisor
-// package. Internally, it creates a supervisor in OneForAll mode.
+// WithContext takes a context and prepare it to be used by easy oversight tree
+// package. Internally, it creates an oversight tree in OneForAll mode.
 func WithContext(ctx context.Context, opts ...oversight.TreeOption) context.Context {
-	chosenName := fmt.Sprintf("supervisor-%d", rand.Uint64())
+	chosenName := fmt.Sprintf("tree-%d", rand.Uint64())
 	baseOpts := append([]oversight.TreeOption{
 		oversight.WithRestartStrategy(oversight.OneForAll()),
 		oversight.NeverHalt(),
@@ -100,7 +100,7 @@ func WithContext(ctx context.Context, opts ...oversight.TreeOption) context.Cont
 	tree := oversight.New(baseOpts...)
 
 	mu.Lock()
-	supervisors[chosenName] = tree
+	trees[chosenName] = tree
 	mu.Unlock()
 
 	wrapped := context.WithValue(ctx, treeName, chosenName)
@@ -108,7 +108,7 @@ func WithContext(ctx context.Context, opts ...oversight.TreeOption) context.Cont
 	return wrapped
 }
 
-// WithLogger attaches a log function to the supervisor
+// WithLogger attaches a log function to the oversight tree.
 func WithLogger(logger *log.Logger) oversight.TreeOption {
 	return oversight.WithLogger(logger)
 }
