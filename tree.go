@@ -363,3 +363,22 @@ func (t *Tree) Delete(name string) error {
 	}
 	return nil
 }
+
+// Children returns the current set of child processes.
+func (t *Tree) Children() []State {
+	t.init()
+	t.semaphore.Lock()
+	defer t.semaphore.Unlock()
+	ret := []State{}
+	for i := range t.states {
+		t.states[i].mu.Lock()
+		name := t.processes[i].Name
+		ret = append(ret, State{
+			Name:  name,
+			State: t.states[i].state,
+			Stop:  t.states[i].stop,
+		})
+		t.states[i].mu.Unlock()
+	}
+	return ret
+}

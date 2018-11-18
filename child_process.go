@@ -6,6 +6,13 @@ import (
 	"time"
 )
 
+// State is a snapshot of the child process current state.
+type State struct {
+	Name  string
+	State string
+	Stop  func()
+}
+
 type state struct {
 	mu    sync.Mutex
 	state string // "" | "running" | "failed" | "done"

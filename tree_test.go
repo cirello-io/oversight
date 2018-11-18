@@ -587,3 +587,51 @@ func Test_deleteChildProc(t *testing.T) {
 	cancel()
 	wg.Wait()
 }
+
+func Test_currentChildren(t *testing.T) {
+	childProcStarted := make(chan struct{})
+	tree := oversight.New(
+		oversight.Process(oversight.ChildProcessSpecification{
+			Restart: oversight.Permanent(),
+			Name:    "alpha",
+			Start: func(ctx context.Context) error {
+				close(childProcStarted)
+				select {
+				case <-ctx.Done():
+				}
+				return nil
+			},
+		}),
+	)
+	var wg sync.WaitGroup
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		tree.Start(ctx)
+	}()
+	<-childProcStarted
+	var foundAlphaRunning bool
+	for _, childproc := range tree.Children() {
+		if childproc.Name == "alpha" && childproc.State == "running" {
+			foundAlphaRunning = true
+			break
+		}
+	}
+	if !foundAlphaRunning {
+		t.Error("did not find alpha running")
+	}
+	cancel()
+	wg.Wait()
+	var foundAlphaFailed bool
+	for _, childproc := range tree.Children() {
+		if childproc.Name == "alpha" && childproc.State == "failed" {
+			foundAlphaFailed = true
+			break
+		}
+	}
+	if !foundAlphaFailed {
+		t.Error("did not find alpha failed")
+	}
+}
