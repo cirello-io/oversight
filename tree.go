@@ -25,6 +25,11 @@ var ErrUnknownProcess = errors.New("unknown process")
 // that are not running.
 var ErrProcessNotRunning = errors.New("process not running")
 
+// ErrTreeNotRunning is returned to Add, Terminate and Delete calls when the
+// oversight tree is initialized but not started yet; or when at that point in
+// time is not running anymore.
+var ErrTreeNotRunning = errors.New("oversight tree is not running")
+
 // Oversight creates and ignites a supervisor tree.
 func Oversight(opts ...TreeOption) ChildProcess {
 	t := New(opts...)
@@ -34,6 +39,7 @@ func Oversight(opts ...TreeOption) ChildProcess {
 // Tree is the supervisor tree proper.
 type Tree struct {
 	initializeOnce sync.Once
+	stopped        chan struct{}
 
 	// semaphore must be held when adding/deleting dynamic processes
 	semaphore      sync.Mutex
@@ -88,16 +94,26 @@ func (t *Tree) init() {
 		}
 		t.logger = log.New(ioutil.Discard, "", 0)
 		t.processIndex = make(map[string]int)
+		t.stopped = make(chan struct{})
 	})
 }
 
-// Add attaches a new child process to a running oversight tree.
-func (t *Tree) Add(spec ChildProcessSpecification) {
+// Add attaches a new child process to a running oversight tree.  This call must
+// be used on running oversight trees, if the tree is not started yet, it is
+// going to block. If the tree is halted, it is going to fail with
+// ErrTreeNotRunning.
+func (t *Tree) Add(spec ChildProcessSpecification) error {
+	select {
+	case <-t.stopped:
+		return ErrTreeNotRunning
+	default:
+	}
 	t.init()
 	t.semaphore.Lock()
 	Process(spec)(t)
 	t.semaphore.Unlock()
 	t.processChanged <- struct{}{}
+	return nil
 }
 
 // Start ignites the supervisor tree.
@@ -199,6 +215,7 @@ func (t *Tree) Start(rootCtx context.Context) error {
 		for {
 			select {
 			case <-ctx.Done():
+				close(t.stopped)
 				defer t.logger.Printf("clean up complete")
 				t.logger.Printf("context canceled (before start): %v", ctx.Err())
 				t.semaphore.Lock()
@@ -314,8 +331,15 @@ func (t *Tree) plugStop(ctx context.Context, processID int, p ChildProcessSpecif
 // Terminate stop the named process. Terminated child processes do not count
 // as failures in the oversight tree restart policy. If the oversight tree runs
 // out of processes to supervise, it will terminate itself with
-// ErrNoChildProcessLeft.
+// ErrNoChildProcessLeft. This call must be used on running oversight trees, if
+// the tree is not started yet, it is going to block. If the tree is halted, it
+// is going to fail with ErrTreeNotRunning.
 func (t *Tree) Terminate(name string) error {
+	select {
+	case <-t.stopped:
+		return ErrTreeNotRunning
+	default:
+	}
 	t.init()
 	t.semaphore.Lock()
 	id, ok := t.processIndex[name]
@@ -346,7 +370,11 @@ func (t *Tree) setStateError(name string, err error, restart bool) {
 	t.states[processID].setErr(err, restart)
 }
 
-// Delete stops the service in the Supervisor tree and remove from it.
+// Delete stops the service in the Supervisor tree and remove from it. If the
+// oversight tree runs out of processes to supervise, it will terminate itself
+// with ErrNoChildProcessLeft. This call must be used on running oversight
+// trees, if the tree is not started yet, it is going to block. If the tree is
+// halted, it is going to fail with ErrTreeNotRunning.
 func (t *Tree) Delete(name string) error {
 	t.init()
 	if err := t.Terminate(name); err != nil {

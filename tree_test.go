@@ -635,3 +635,26 @@ func Test_currentChildren(t *testing.T) {
 		t.Error("did not find alpha failed")
 	}
 }
+
+func Test_operationsOnDeadTree(t *testing.T) {
+	tree := oversight.New(
+		oversight.Process(oversight.ChildProcessSpecification{
+			Restart: oversight.Permanent(),
+			Name:    "alpha",
+			Start:   func(ctx context.Context) error { return nil },
+		}),
+	)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	tree.Start(ctx)
+	err := tree.Add(oversight.ChildProcessSpecification{
+		Name:  "beta",
+		Start: func(context.Context) error { return nil },
+	})
+	if err != oversight.ErrTreeNotRunning {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := tree.Delete("alpha"); err != oversight.ErrTreeNotRunning {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
