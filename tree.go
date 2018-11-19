@@ -54,7 +54,7 @@ type Tree struct {
 	rootErrMu sync.Mutex
 	rootErr   error
 
-	logger *log.Logger
+	logger Logger
 }
 
 // New creates a new oversight (supervisor) tree with the applied options.

@@ -24,7 +24,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"math/rand"
 	"sync"
 
@@ -109,7 +108,7 @@ func WithContext(ctx context.Context, opts ...oversight.TreeOption) context.Cont
 }
 
 // WithLogger attaches a log function to the oversight tree.
-func WithLogger(logger *log.Logger) oversight.TreeOption {
+func WithLogger(logger oversight.Logger) oversight.TreeOption {
 	return oversight.WithLogger(logger)
 }
 

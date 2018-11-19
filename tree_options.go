@@ -2,7 +2,6 @@ package oversight
 
 import (
 	"fmt"
-	"log"
 	"time"
 )
 
@@ -106,8 +105,15 @@ func Process(spec ChildProcessSpecification) TreeOption {
 	}
 }
 
+// Logger defines the interface for any logging facility to be compatible with
+// oversight trees.
+type Logger interface {
+	Printf(format string, args ...interface{})
+	Println(args ...interface{})
+}
+
 // WithLogger plugs a custom logger to the oversight tree.
-func WithLogger(logger *log.Logger) TreeOption {
+func WithLogger(logger Logger) TreeOption {
 	return func(t *Tree) {
 		t.logger = logger
 	}
