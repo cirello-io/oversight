@@ -51,10 +51,9 @@ type Tree struct {
 	processChanged chan struct{}  // indicates that some change to process slice has been made
 	processIndex   map[string]int // map of ChildProcessSpecification.Name to internal ID
 
-	rootErrMu sync.Mutex
-	rootErr   error
-
 	logger Logger
+
+	err error
 }
 
 // New creates a new oversight (supervisor) tree with the applied options.
@@ -65,20 +64,6 @@ func New(opts ...TreeOption) *Tree {
 		opt(t)
 	}
 	return t
-}
-
-func (t *Tree) setErr(err error) {
-	t.rootErrMu.Lock()
-	defer t.rootErrMu.Unlock()
-	if t.rootErr == nil {
-		t.rootErr = err
-	}
-}
-
-func (t *Tree) err() error {
-	t.rootErrMu.Lock()
-	defer t.rootErrMu.Unlock()
-	return t.rootErr
 }
 
 func (t *Tree) init() {
@@ -201,89 +186,80 @@ func (t *Tree) Start(rootCtx context.Context) error {
 	t.init()
 	ctx, cancel := context.WithCancel(rootCtx)
 	defer cancel()
-	var wg sync.WaitGroup
-	defer wg.Wait()
 	restarter := &restart{
 		intensity: t.maxR,
 		period:    t.maxT,
 	}
 	failure := make(chan int)
 	var anyStartedProcessEver bool
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for {
-			select {
-			case <-ctx.Done():
-				close(t.stopped)
-				defer t.logger.Printf("clean up complete")
-				t.logger.Printf("context canceled (before start): %v", ctx.Err())
-				t.semaphore.Lock()
-				OneForAll()(t, 0)
-				t.semaphore.Unlock()
-				for {
-					select {
-					case <-t.processChanged:
-					default:
-						return
-					}
-				}
-			default:
-			}
-
+	for {
+		select {
+		case <-ctx.Done():
+			close(t.stopped)
+			defer t.logger.Printf("clean up complete")
+			t.logger.Printf("context canceled (before start): %v", ctx.Err())
 			t.semaphore.Lock()
-			anyNewStartedProcess := false
-			startSemaphore := make(chan struct{})
-			for i, p := range t.processes {
-				running := t.states[i].current()
-				if running.state == Running {
-					anyNewStartedProcess = true
-					continue
-				}
-				if running.state == Done {
-					continue
-				}
-				if running.state == Failed &&
-					!p.Restart(running.err) {
-					continue
-				}
-				anyNewStartedProcess = true
-				anyStartedProcessEver = true
-				t.logger.Printf("starting %v", p.Name)
-				t.startChildProcess(ctx, i, p, startSemaphore,
-					failure)
-			}
-			close(startSemaphore)
+			OneForAll()(t, 0)
 			t.semaphore.Unlock()
-			if !anyNewStartedProcess && anyStartedProcessEver {
-				t.logger.Printf("no child process left after start")
-				t.setErr(ErrNoChildProcessLeft)
+			for {
+				select {
+				case <-t.processChanged:
+				default:
+					return t.err
+				}
+			}
+		default:
+		}
+
+		t.semaphore.Lock()
+		anyNewStartedProcess := false
+		startSemaphore := make(chan struct{})
+		for i, p := range t.processes {
+			running := t.states[i].current()
+			if running.state == Running {
+				anyNewStartedProcess = true
+				continue
+			}
+			if running.state == Done {
+				continue
+			}
+			if running.state == Failed &&
+				!p.Restart(running.err) {
+				continue
+			}
+			anyNewStartedProcess = true
+			anyStartedProcessEver = true
+			t.logger.Printf("starting %v", p.Name)
+			t.startChildProcess(ctx, i, p, startSemaphore,
+				failure)
+		}
+		close(startSemaphore)
+		t.semaphore.Unlock()
+		if !anyNewStartedProcess && anyStartedProcessEver {
+			t.logger.Printf("no child process left after start")
+			t.err = ErrNoChildProcessLeft
+			cancel()
+		}
+
+		select {
+		case <-ctx.Done():
+		case <-t.processChanged:
+			t.logger.Println("detected change in child processes list")
+		case failedChild := <-failure:
+			t.semaphore.Lock()
+			t.logger.Printf("child process failure detected (%v)", t.processes[failedChild].Name)
+			t.strategy(t, failedChild)
+			t.semaphore.Unlock()
+			if restarter.terminate(time.Now()) {
+				t.logger.Printf("too many failures detected:")
+				for _, restart := range restarter.restarts {
+					t.logger.Println("-", restart)
+				}
+				t.err = ErrTooManyFailures
 				cancel()
 			}
-
-			select {
-			case <-ctx.Done():
-			case <-t.processChanged:
-				t.logger.Println("detected change in child processes list")
-			case failedChild := <-failure:
-				t.semaphore.Lock()
-				t.logger.Printf("child process failure detected (%v)", t.processes[failedChild].Name)
-				t.strategy(t, failedChild)
-				t.semaphore.Unlock()
-				if restarter.terminate(time.Now()) {
-					t.logger.Printf("too many failures detected:")
-					for _, restart := range restarter.restarts {
-						t.logger.Println("-", restart)
-					}
-					t.setErr(ErrTooManyFailures)
-					cancel()
-				}
-			}
 		}
-	}()
-
-	wg.Wait()
-	return t.err()
+	}
 }
 
 func (t *Tree) startChildProcess(ctx context.Context, processID int,
