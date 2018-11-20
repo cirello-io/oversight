@@ -103,12 +103,12 @@ func (t *Tree) init() {
 // going to block. If the tree is halted, it is going to fail with
 // ErrTreeNotRunning.
 func (t *Tree) Add(spec ChildProcessSpecification) error {
+	t.init()
 	select {
 	case <-t.stopped:
 		return ErrTreeNotRunning
 	default:
 	}
-	t.init()
 	t.semaphore.Lock()
 	Process(spec)(t)
 	t.semaphore.Unlock()
@@ -335,12 +335,12 @@ func (t *Tree) plugStop(ctx context.Context, processID int, p ChildProcessSpecif
 // the tree is not started yet, it is going to block. If the tree is halted, it
 // is going to fail with ErrTreeNotRunning.
 func (t *Tree) Terminate(name string) error {
+	t.init()
 	select {
 	case <-t.stopped:
 		return ErrTreeNotRunning
 	default:
 	}
-	t.init()
 	t.semaphore.Lock()
 	id, ok := t.processIndex[name]
 	if !ok {
