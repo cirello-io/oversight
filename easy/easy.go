@@ -51,7 +51,7 @@ func init() {
 // Add inserts a supervised function to the attached tree, it launches
 // automatically. If the context is not correctly prepared, it returns an
 // ErrNoTreeAttached error. The restart policy is Permanent.
-func Add(ctx context.Context, f oversight.ChildProcess) (string, error) {
+func Add(ctx context.Context, f oversight.ChildProcess, opts ...Option) (string, error) {
 	name, ok := extractName(ctx)
 	if !ok {
 		return "", ErrNoTreeAttached
@@ -62,12 +62,38 @@ func Add(ctx context.Context, f oversight.ChildProcess) (string, error) {
 	if !ok {
 		panic("oversight tree not found")
 	}
-	svr.Add(oversight.ChildProcessSpecification{
+
+	spec := oversight.ChildProcessSpecification{
 		Name:    name,
 		Restart: oversight.Permanent(),
 		Start:   f,
-	})
+	}
+	for _, opt := range opts {
+		opt(&spec)
+	}
+	svr.Add(spec)
 	return name, nil
+}
+
+// Option reconfigures the attachment of a process to the context tree.
+type Option func(*oversight.ChildProcessSpecification)
+
+var (
+	// Permanent services are always restarted.
+	Permanent = oversight.Permanent
+
+	// Transient services are restarted only when panic.
+	Transient = oversight.Transient
+
+	// Temporary services are never restarted.
+	Temporary = oversight.Temporary
+)
+
+// RestartWith changes the restart policy for the process.
+func RestartWith(restart oversight.Restart) Option {
+	return func(spec *oversight.ChildProcessSpecification) {
+		spec.Restart = restart
+	}
 }
 
 // Delete stops and removes the given service from the attached tree. If
