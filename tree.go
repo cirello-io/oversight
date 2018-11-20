@@ -236,14 +236,14 @@ func (t *Tree) Start(rootCtx context.Context) error {
 			startSemaphore := make(chan struct{})
 			for i, p := range t.processes {
 				running := t.states[i].current()
-				if running.state == "running" {
+				if running.state == Running {
 					anyNewStartedProcess = true
 					continue
 				}
-				if running.state == "done" {
+				if running.state == Done {
 					continue
 				}
-				if running.state == "failed" &&
+				if running.state == Failed &&
 					!p.Restart(running.err) {
 					continue
 				}
@@ -350,12 +350,12 @@ func (t *Tree) Terminate(name string) error {
 	t.states[id].mu.Lock()
 	state := t.states[id].state
 	stop := t.states[id].stop
-	if state != "running" || stop == nil {
+	if state != Running || stop == nil {
 		t.states[id].mu.Unlock()
 		t.semaphore.Unlock()
 		return ErrProcessNotRunning
 	}
-	t.states[id].state = "done"
+	t.states[id].state = Done
 	t.states[id].mu.Unlock()
 	t.semaphore.Unlock()
 	stop()
