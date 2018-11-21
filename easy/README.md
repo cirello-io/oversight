@@ -3,6 +3,7 @@
 [![travis-ci](https://api.travis-ci.org/ucirello/oversight.svg?branch=master)](https://travis-ci.org/ucirello/oversight)
 [![GoDoc](https://godoc.org/cirello.io/oversight/easy?status.svg)](https://godoc.org/cirello.io/oversight/easy)
 
+This repository is covered by this [SLA](https://github.com/ucirello/public/blob/master/SLA.md).
 
 Package easy is an easier interface to use cirello.io/oversight. Its lifecycle
 is managed through context.Context. Stop a given oversight tree by cancelling

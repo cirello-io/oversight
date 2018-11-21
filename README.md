@@ -3,6 +3,7 @@
 [![travis-ci](https://api.travis-ci.org/ucirello/oversight.svg?branch=master)](https://travis-ci.org/ucirello/oversight)
 [![GoDoc](https://godoc.org/cirello.io/oversight?status.svg)](https://godoc.org/cirello.io/oversight)
 
+This repository is covered by this [SLA](https://github.com/ucirello/public/blob/master/SLA.md).
 
 Package oversight makes a nearly complete implementation of the Erlang
 supervision trees.
