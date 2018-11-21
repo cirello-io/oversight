@@ -33,4 +33,6 @@
 //     if err := supervise(ctx); err != nil {
 //     	log.Fatal(err)
 //     }
+//
+// This package is covered by this SLA: https://cirello.io/sla
 package oversight // import "cirello.io/oversight"

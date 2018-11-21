@@ -31,6 +31,8 @@ its context.
 			// ...
 		})
 	}
+
+This package is covered by this SLA: https://cirello.io/sla
 */
 package easy // import "cirello.io/oversight/easy"
 
