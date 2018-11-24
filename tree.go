@@ -285,6 +285,9 @@ func (t *Tree) startChildProcess(ctx context.Context, processID int,
 		t.logger.Println(p.Name, "child started")
 		defer t.logger.Println(p.Name, "child done")
 		err := safeRun(childCtx, p.Start)
+		if err != nil {
+			t.logger.Println(p.Name, "errored:", err)
+		}
 		restart := p.Restart(err)
 		t.setStateError(p.Name, err, restart)
 		select {
