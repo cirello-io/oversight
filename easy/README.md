@@ -9,7 +9,7 @@ Package easy is an easier interface to use cirello.io/oversight. Its lifecycle
 is managed through context.Context. Stop a given oversight tree by cancelling
 its context.
 
-go get [-f -u] cirello.io/oversight/easy
+go get [-u -f] cirello.io/oversight/easy
 
 http://godoc.org/cirello.io/oversight/easy
 

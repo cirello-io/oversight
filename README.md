@@ -10,7 +10,7 @@ supervision trees.
 
 Refer to: http://erlang.org/doc/design_principles/sup_princ.html
 
-go get [-f -u] cirello.io/oversight
+go get [-u -f] cirello.io/oversight
 
 http://godoc.org/cirello.io/oversight
 
