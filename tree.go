@@ -226,12 +226,12 @@ func (t *Tree) Start(rootCtx context.Context) error {
 		}
 
 		t.semaphore.Lock()
-		anyNewStartedProcess := false
+		anyRunningProcess := false
 		startSemaphore := make(chan struct{})
 		for i, p := range t.processes {
 			running := t.states[i].current()
 			if running.state == Running {
-				anyNewStartedProcess = true
+				anyRunningProcess = true
 				continue
 			}
 			if running.state == Done {
@@ -241,7 +241,7 @@ func (t *Tree) Start(rootCtx context.Context) error {
 				!p.Restart(running.err) {
 				continue
 			}
-			anyNewStartedProcess = true
+			anyRunningProcess = true
 			anyStartedProcessEver = true
 			t.logger.Printf("starting %v", p.Name)
 			t.startChildProcess(ctx, i, p, startSemaphore,
@@ -249,7 +249,7 @@ func (t *Tree) Start(rootCtx context.Context) error {
 		}
 		close(startSemaphore)
 		t.semaphore.Unlock()
-		if !anyNewStartedProcess && anyStartedProcessEver {
+		if !anyRunningProcess && anyStartedProcessEver {
 			t.logger.Printf("no child process left after start")
 			t.err = ErrNoChildProcessLeft
 			cancel()
