@@ -89,33 +89,35 @@ func Processes(processes ...ChildProcess) TreeOption {
 	}
 }
 
-// Process plugs one child processes to the supervisor tree. Process never reset
-// the child process list.
-func Process(spec ChildProcessSpecification) TreeOption {
+// Process plugs one or more child processes to the supervisor tree. Process
+// never reset the child process list.
+func Process(specs ...ChildProcessSpecification) TreeOption {
 	return func(t *Tree) {
-		id := len(t.processes) + 1
-		t.states = append(t.states, state{
-			stop: func() {
-				t.logger.Println("stopped before start")
-			},
-		})
-		if spec.Name == "" {
-			spec.Name = fmt.Sprintf("childproc %d", id)
+		for _, spec := range specs {
+			id := len(t.processes) + 1
+			t.states = append(t.states, state{
+				stop: func() {
+					t.logger.Println("stopped before start")
+				},
+			})
+			if spec.Name == "" {
+				spec.Name = fmt.Sprintf("childproc %d", id)
+			}
+			if _, ok := t.processIndex[spec.Name]; ok {
+				spec.Name += fmt.Sprint(" ", id)
+			}
+			if spec.Restart == nil {
+				spec.Restart = Permanent()
+			}
+			if spec.Shutdown == nil {
+				spec.Shutdown = Timeout(DefaultChildProcessTimeout)
+			}
+			if spec.Start == nil {
+				panic("child process must always have a function")
+			}
+			t.processes = append(t.processes, spec)
+			t.processIndex[spec.Name] = id - 1
 		}
-		if _, ok := t.processIndex[spec.Name]; ok {
-			spec.Name += fmt.Sprint(" ", id)
-		}
-		if spec.Restart == nil {
-			spec.Restart = Permanent()
-		}
-		if spec.Shutdown == nil {
-			spec.Shutdown = Timeout(DefaultChildProcessTimeout)
-		}
-		if spec.Start == nil {
-			panic("child process must always have a function")
-		}
-		t.processes = append(t.processes, spec)
-		t.processIndex[spec.Name] = id - 1
 	}
 }
 
