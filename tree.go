@@ -111,13 +111,13 @@ func (t *Tree) init() {
 	t.initializeOnce.Do(func() {
 		t.semaphore.Lock()
 		defer t.semaphore.Unlock()
-		isValidConfiguration := t.MaxR >= -1 && t.MaxT >= 0
+		t.maxR = t.MaxR
+		t.maxT = t.MaxT
+		isValidConfiguration := t.maxR >= -1 && t.maxT >= 0
 		if !isValidConfiguration {
 			t.err = ErrInvalidConfiguration
 			return
 		}
-		t.maxR = t.MaxR
-		t.maxT = t.MaxT
 		t.strategy = t.Restart
 		t.processChanged = make(chan struct{}, 1)
 		if t.maxR == 0 && t.maxT == 0 {

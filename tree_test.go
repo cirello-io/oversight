@@ -707,3 +707,22 @@ func Test_simpleInterface(t *testing.T) {
 		t.Fatalf("forest of trees did not run correctly: %v %v", treeRan, subTreeRan)
 	}
 }
+
+func Test_invalidTreeConfiguration(t *testing.T) {
+	trees := []*oversight.Tree{
+		&oversight.Tree{MaxR: -2, MaxT: -1},
+		&oversight.Tree{MaxR: -1, MaxT: -1},
+		&oversight.Tree{MaxR: 0, MaxT: -1},
+	}
+	for _, tree := range trees {
+		if err := tree.Start(context.Background()); err != oversight.ErrInvalidConfiguration {
+			t.Errorf("unexpected error for an invalid configuration: %v", err)
+		}
+		if err := tree.Add(func(context.Context) error { return nil }); err != oversight.ErrTreeNotRunning {
+			t.Errorf("unexpected error for an Add() operations on a badly configured tree: %v", err)
+		}
+		if err := tree.Delete("404"); err != oversight.ErrTreeNotRunning {
+			t.Errorf("unexpected error for a Delete() operations on a badly configured tree: %v", err)
+		}
+	}
+}
