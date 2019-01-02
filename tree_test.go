@@ -672,3 +672,33 @@ func Test_operationsOnDeadTree(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func Test_simpleInterface(t *testing.T) {
+	var treeRan, subTreeRan bool
+	var tree oversight.Tree
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		tree.Start(ctx)
+	}()
+	tree.Add(func(ctx context.Context) error {
+		treeRan = true
+		return nil
+	})
+	subtree := &oversight.Tree{
+		MaxR:    -1,
+		Restart: oversight.OneForAll(),
+	}
+	subtree.Add(func(ctx context.Context) error {
+		subTreeRan = true
+		return nil
+	})
+	tree.Add(subtree)
+	wg.Wait()
+	if !treeRan || !subTreeRan {
+		t.Fatalf("forest of trees did not run correctly: %v %v", treeRan, subTreeRan)
+	}
+}

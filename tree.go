@@ -44,6 +44,14 @@ var ErrProcessNotRunning = errors.New("process not running")
 // time is not running anymore.
 var ErrTreeNotRunning = errors.New("oversight tree is not running")
 
+// ErrInvalidChildProcessType is returned when caller tries to add an invalid
+// child process to the oversight tree. The child process type must always be
+// ChildProcessSpecification, ChildProcess, and *Tree.
+var ErrInvalidChildProcessType = errors.New("invalid child process type")
+
+// ErrInvalidConfiguration is returned when tree has invalid settings.
+var ErrInvalidConfiguration = errors.New("invalid tree configuration")
+
 // Oversight creates and ignites a supervisor tree.
 func Oversight(opts ...TreeOption) ChildProcess {
 	t := New(opts...)
@@ -52,6 +60,20 @@ func Oversight(opts ...TreeOption) ChildProcess {
 
 // Tree is the supervisor tree proper.
 type Tree struct {
+	// MaxR is the maximum number of restarts before the oversight tree
+	// gives up and halts. Set to -1 to prevent the tree from halting.
+	// Default value is DefaultMaxR.
+	MaxR int
+	// MaxT is the maximum time duration before the counted restarts are
+	// thrown away.
+	// Default value is DefaultMaxT.
+	MaxT time.Duration
+	// Restart strategy defines how the oversight tree handle individual
+	// child processes errors (OneForOne, OneForAll, RestForOne and
+	// SimpleOneForOne).
+	// Default value is OneForOne()
+	Restart Strategy
+
 	initializeOnce sync.Once
 	stopped        chan struct{}
 
@@ -89,6 +111,14 @@ func (t *Tree) init() {
 	t.initializeOnce.Do(func() {
 		t.semaphore.Lock()
 		defer t.semaphore.Unlock()
+		isValidConfiguration := t.MaxR >= -1 && t.MaxT >= 0
+		if !isValidConfiguration {
+			t.err = ErrInvalidConfiguration
+			return
+		}
+		t.maxR = t.MaxR
+		t.maxT = t.MaxT
+		t.strategy = t.Restart
 		t.processChanged = make(chan struct{}, 1)
 		if t.maxR == 0 && t.maxT == 0 {
 			DefaultRestartIntensity()(t)
@@ -110,16 +140,34 @@ func (t *Tree) init() {
 // Add attaches a new child process to a running oversight tree.  This call must
 // be used on running oversight trees, if the tree is not started yet, it is
 // going to block. If the tree is halted, it is going to fail with
-// ErrTreeNotRunning.
-func (t *Tree) Add(spec ChildProcessSpecification) error {
+// ErrTreeNotRunning. The valid types are ChildProcessSpecification,
+// ChildProcess, and *Tree. If the added child process is invalid, it is
+// going to fail with ErrInvalidChildProcessType.
+func (t *Tree) Add(spec interface{}) error {
 	t.init()
+	if t.err != nil {
+		return t.err
+	}
 	select {
 	case <-t.stopped:
 		return ErrTreeNotRunning
 	default:
 	}
+	var add func()
+	switch p := spec.(type) {
+	case ChildProcessSpecification:
+		add = func() { Process(p)(t) }
+	case ChildProcess:
+		add = func() { Processes(p)(t) }
+	case func(ctx context.Context) error:
+		add = func() { Processes(p)(t) }
+	case *Tree:
+		add = func() { WithTree(p)(t) }
+	default:
+		return ErrInvalidChildProcessType
+	}
 	t.semaphore.Lock()
-	Process(spec)(t)
+	add()
 	t.semaphore.Unlock()
 	t.processChanged <- struct{}{}
 	return nil
@@ -208,6 +256,9 @@ func (t *Tree) Start(rootCtx context.Context) error {
 		contexts cancelations to propagate termination calls.
 	*/
 	t.init()
+	if t.err != nil {
+		return t.err
+	}
 	ctx, cancel := context.WithCancel(rootCtx)
 	defer cancel()
 	for {
@@ -342,6 +393,9 @@ func (t *Tree) plugStop(ctx context.Context, processID int, p ChildProcessSpecif
 // is going to fail with ErrTreeNotRunning.
 func (t *Tree) Terminate(name string) error {
 	t.init()
+	if t.err != nil {
+		return t.err
+	}
 	select {
 	case <-t.stopped:
 		return ErrTreeNotRunning
@@ -376,13 +430,12 @@ func (t *Tree) setStateError(name string, err error, restart bool) {
 	t.states[processID].setErr(err, restart)
 }
 
-// Delete stops the service in the Supervisor tree and remove from it. If the
+// Delete stops the service in the oversight tree and remove from it. If the
 // oversight tree runs out of processes to supervise, it will terminate itself
 // with ErrNoChildProcessLeft. This call must be used on running oversight
 // trees, if the tree is not started yet, it is going to block. If the tree is
 // halted, it is going to fail with ErrTreeNotRunning.
 func (t *Tree) Delete(name string) error {
-	t.init()
 	if err := t.Terminate(name); err != nil {
 		return err
 	}
