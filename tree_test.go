@@ -726,3 +726,30 @@ func Test_invalidTreeConfiguration(t *testing.T) {
 		}
 	}
 }
+
+func Test_multipleAdd(t *testing.T) {
+	t.Parallel()
+	var tree oversight.Tree
+	var f oversight.ChildProcess = func(context.Context) error { return nil }
+	children := []struct {
+		name          string
+		f             interface{}
+		expectedError error
+	}{
+		{"childProcessSpecification", oversight.ChildProcessSpecification{Start: f}, nil},
+		{"abstract childProcess", f, nil},
+		{"concrete childProcess", func(context.Context) error { return nil }, nil},
+		{"tree", &oversight.Tree{}, nil},
+		{"invalid", func() {}, oversight.ErrInvalidChildProcessType},
+	}
+	for _, child := range children {
+		err := tree.Add(child.f)
+		if err != child.expectedError {
+			t.Errorf("unexpected error found for %v: %v (expected: %v)",
+				child.name, err, child.expectedError)
+		}
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	tree.Start(ctx)
+}
