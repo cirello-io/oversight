@@ -146,7 +146,7 @@ func (t *Tree) init() {
 func (t *Tree) Add(spec interface{}) error {
 	t.init()
 	if t.err != nil {
-		return t.err
+		return ErrTreeNotRunning
 	}
 	select {
 	case <-t.stopped:
@@ -394,7 +394,7 @@ func (t *Tree) plugStop(ctx context.Context, processID int, p ChildProcessSpecif
 func (t *Tree) Terminate(name string) error {
 	t.init()
 	if t.err != nil {
-		return t.err
+		return ErrTreeNotRunning
 	}
 	select {
 	case <-t.stopped:
