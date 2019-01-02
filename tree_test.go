@@ -57,6 +57,7 @@ func ExampleTree_singlePermanent() {
 }
 
 func TestTree_childProcessRestarts(t *testing.T) {
+	t.Parallel()
 	t.Run("permanent", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -185,6 +186,7 @@ func TestTree_childProcessRestarts(t *testing.T) {
 }
 
 func TestTree_treeRestarts(t *testing.T) {
+	t.Parallel()
 	t.Run("oneForOne", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -338,6 +340,7 @@ func TestTree_treeRestarts(t *testing.T) {
 }
 
 func Test_nestedTree(t *testing.T) {
+	t.Parallel()
 	var (
 		leafMu    sync.Mutex
 		leafCount = 0
@@ -393,6 +396,7 @@ func Test_nestedTree(t *testing.T) {
 }
 
 func Test_dynamicChild(t *testing.T) {
+	t.Parallel()
 	tempExecCount := 0
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -421,6 +425,7 @@ func Test_dynamicChild(t *testing.T) {
 }
 
 func Test_customLogger(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	var buf bytes.Buffer
@@ -443,6 +448,7 @@ func Test_customLogger(t *testing.T) {
 }
 
 func Test_childProcTimeout(t *testing.T) {
+	t.Parallel()
 	blockedCtx, blockedCancel := context.WithCancel(context.Background())
 	defer blockedCancel()
 	started := make(chan struct{})
@@ -500,6 +506,7 @@ func Test_childProcTimeout(t *testing.T) {
 }
 
 func Test_terminateChildProc(t *testing.T) {
+	t.Parallel()
 	var processTerminated bool
 	processStarted := make(chan struct{})
 	tree := oversight.New(
@@ -550,6 +557,7 @@ func Test_terminateChildProc(t *testing.T) {
 }
 
 func Test_deleteChildProc(t *testing.T) {
+	t.Parallel()
 	processStarted := make(chan struct{})
 	tree := oversight.New(
 		oversight.Process(oversight.ChildProcessSpecification{
@@ -603,6 +611,7 @@ func Test_deleteChildProc(t *testing.T) {
 }
 
 func Test_currentChildren(t *testing.T) {
+	t.Parallel()
 	childProcStarted := make(chan struct{})
 	tree := oversight.New(
 		oversight.Process(oversight.ChildProcessSpecification{
@@ -651,6 +660,7 @@ func Test_currentChildren(t *testing.T) {
 }
 
 func Test_operationsOnDeadTree(t *testing.T) {
+	t.Parallel()
 	tree := oversight.New(
 		oversight.Process(oversight.ChildProcessSpecification{
 			Restart: oversight.Permanent(),
@@ -674,6 +684,7 @@ func Test_operationsOnDeadTree(t *testing.T) {
 }
 
 func Test_simpleInterface(t *testing.T) {
+	t.Parallel()
 	var treeRan, subTreeRan bool
 	var tree oversight.Tree
 	ctx, cancel := context.WithCancel(context.Background())
