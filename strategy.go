@@ -14,7 +14,10 @@
 
 package oversight
 
-// Strategy defines how the supervisor handles individual failures.
+// Strategy defines how the supervisor handles individual failures and tree
+// shutdowns (best effort). The shutdown is initiated in the reverse order of
+// the start of the child processes. The Go scheduler implementation makes it
+// impossible to guarantee any order regarding shutdown completion.
 type Strategy func(t *Tree, failedChildID int)
 
 // OneForOne ensures that if a child process terminates, only that process is
