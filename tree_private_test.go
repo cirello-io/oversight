@@ -31,3 +31,18 @@ func Test_uniqueName(t *testing.T) {
 		}
 	}
 }
+
+func Test_invalidChildProcessSpecification(t *testing.T) {
+	var foundPanic bool
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				foundPanic = true
+			}
+		}()
+		New(Process(ChildProcessSpecification{}))
+	}()
+	if !foundPanic {
+		t.Error("invalid child process specification should trigger have triggered a panic")
+	}
+}
