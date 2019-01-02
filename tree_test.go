@@ -689,12 +689,6 @@ func Test_simpleInterface(t *testing.T) {
 	var tree oversight.Tree
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		tree.Start(ctx)
-	}()
 	tree.Add(func(ctx context.Context) error {
 		treeRan = true
 		return nil
@@ -708,7 +702,7 @@ func Test_simpleInterface(t *testing.T) {
 		return nil
 	})
 	tree.Add(subtree)
-	wg.Wait()
+	tree.Start(ctx)
 	if !treeRan || !subTreeRan {
 		t.Fatalf("forest of trees did not run correctly: %v %v", treeRan, subTreeRan)
 	}

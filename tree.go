@@ -138,11 +138,10 @@ func (t *Tree) init() {
 }
 
 // Add attaches a new child process to a running oversight tree.  This call must
-// be used on running oversight trees, if the tree is not started yet, it is
-// going to block. If the tree is halted, it is going to fail with
-// ErrTreeNotRunning. The valid types are ChildProcessSpecification,
-// ChildProcess, and *Tree. If the added child process is invalid, it is
-// going to fail with ErrInvalidChildProcessType.
+// be used on running oversight trees. If the tree is halted, it is going to
+// fail with ErrTreeNotRunning. The valid types are ChildProcessSpecification,
+// ChildProcess, and *Tree. If the added child process is invalid, it is going
+// to fail with ErrInvalidChildProcessType.
 func (t *Tree) Add(spec interface{}) error {
 	t.init()
 	if t.err != nil {
@@ -169,7 +168,7 @@ func (t *Tree) Add(spec interface{}) error {
 	t.semaphore.Lock()
 	add()
 	t.semaphore.Unlock()
-	t.processChanged <- struct{}{}
+	go func() { t.processChanged <- struct{}{} }()
 	return nil
 }
 
