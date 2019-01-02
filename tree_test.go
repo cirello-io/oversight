@@ -669,7 +669,7 @@ func Test_operationsOnDeadTree(t *testing.T) {
 		}),
 	)
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	cancel()
 	tree.Start(ctx)
 	err := tree.Add(oversight.ChildProcessSpecification{
 		Name:  "beta",
