@@ -17,6 +17,7 @@ package easy_test
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"sync"
 	"time"
@@ -27,9 +28,8 @@ import (
 func Example() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
 	var wg sync.WaitGroup
-	ctx = oversight.WithContext(ctx)
+	ctx = oversight.WithContext(ctx, oversight.WithLogger(log.New(ioutil.Discard, "", 0)))
 	wg.Add(1)
 	serviceName, err := oversight.Add(ctx, func(ctx context.Context) error {
 		select {
@@ -41,17 +41,14 @@ func Example() {
 			cancel()
 			return nil
 		}
-	})
+	}, oversight.RestartWith(oversight.Temporary()))
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	wg.Wait()
-
 	if err := oversight.Delete(ctx, serviceName); err != nil {
 		log.Fatal(err)
 	}
-
 	// Output:
 	// executed successfully
 }
