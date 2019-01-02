@@ -302,10 +302,6 @@ func (t *Tree) startChildProcesses(ctx context.Context, cancel context.CancelFun
 		if running.state == Done {
 			continue
 		}
-		if running.state == Failed &&
-			!p.Restart(running.err) {
-			continue
-		}
 		anyRunningProcess = true
 		t.anyStartedProcessEver = true
 		t.logger.Printf("starting %v", p.Name)
