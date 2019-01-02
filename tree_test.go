@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -752,4 +753,219 @@ func Test_multipleAdd(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	tree.Start(ctx)
+}
+
+func TestTree_shutdownOrder(t *testing.T) {
+	t.Parallel()
+	t.Run("oneForOne", func(t *testing.T) {
+		var (
+			mu     sync.Mutex
+			order  []int
+			wgFunc sync.WaitGroup
+		)
+		wgFunc.Add(4)
+		f := func(i int) oversight.ChildProcess {
+			return func(ctx context.Context) error {
+				wgFunc.Done()
+				<-ctx.Done()
+				time.Sleep(time.Duration(i) * 100 * time.Millisecond)
+				mu.Lock()
+				order = append(order, i)
+				mu.Unlock()
+				return nil
+			}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		var buf bytes.Buffer
+		logger := log.New(&buf, "", 0)
+		supervise := oversight.Oversight(
+			oversight.WithLogger(logger),
+			oversight.NeverHalt(),
+			oversight.WithRestartStrategy(oversight.OneForOne()),
+			oversight.Processes(
+				f(1), f(2), f(3), f(4),
+				func(ctx context.Context) error {
+					wgFunc.Wait()
+					<-ctx.Done()
+					return nil
+				},
+			),
+		)
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			supervise(ctx)
+		}()
+		wgFunc.Wait()
+		cancel()
+		wg.Wait()
+		if ctx.Err() == context.DeadlineExceeded {
+			t.Error("should never reach deadline exceeded")
+		}
+		if !sort.IntsAreSorted(order) {
+			t.Errorf("OneForOne not shutting down in reverse start order: %v", order)
+			t.Log("log:", buf.String())
+		}
+	})
+	t.Run("oneForAll", func(t *testing.T) {
+		var (
+			mu     sync.Mutex
+			order  []int
+			wgFunc sync.WaitGroup
+		)
+		wgFunc.Add(4)
+		f := func(i int) oversight.ChildProcess {
+			return func(ctx context.Context) error {
+				wgFunc.Done()
+				<-ctx.Done()
+				time.Sleep(time.Duration(i) * 100 * time.Millisecond)
+				mu.Lock()
+				order = append(order, i)
+				mu.Unlock()
+				return nil
+			}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		var buf bytes.Buffer
+		logger := log.New(&buf, "", 0)
+		supervise := oversight.Oversight(
+			oversight.WithLogger(logger),
+			oversight.NeverHalt(),
+			oversight.WithRestartStrategy(oversight.OneForAll()),
+			oversight.Processes(
+				f(1), f(2), f(3), f(4),
+				func(ctx context.Context) error {
+					wgFunc.Wait()
+					<-ctx.Done()
+					return nil
+				},
+			),
+		)
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			supervise(ctx)
+		}()
+		wgFunc.Wait()
+		cancel()
+		wg.Wait()
+		if ctx.Err() == context.DeadlineExceeded {
+			t.Error("should never reach deadline exceeded")
+		}
+		if !sort.IntsAreSorted(order) {
+			t.Errorf("OneForAll not shutting down in reverse start order: %v", order)
+			t.Log("log:", buf.String())
+		}
+	})
+	t.Run("restForOne", func(t *testing.T) {
+		var (
+			mu     sync.Mutex
+			order  []int
+			wgFunc sync.WaitGroup
+		)
+		wgFunc.Add(4)
+		f := func(i int) oversight.ChildProcess {
+			return func(ctx context.Context) error {
+				wgFunc.Done()
+				<-ctx.Done()
+				time.Sleep(time.Duration(i) * 100 * time.Millisecond)
+				mu.Lock()
+				order = append(order, i)
+				mu.Unlock()
+				return nil
+			}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		var buf bytes.Buffer
+		logger := log.New(&buf, "", 0)
+		supervise := oversight.Oversight(
+			oversight.WithLogger(logger),
+			oversight.NeverHalt(),
+			oversight.WithRestartStrategy(oversight.RestForOne()),
+			oversight.Processes(
+				f(1), f(2), f(3), f(4),
+				func(ctx context.Context) error {
+					wgFunc.Wait()
+					<-ctx.Done()
+					return nil
+				},
+			),
+		)
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			supervise(ctx)
+		}()
+		wgFunc.Wait()
+		cancel()
+		wg.Wait()
+		if ctx.Err() == context.DeadlineExceeded {
+			t.Error("should never reach deadline exceeded")
+		}
+		if !sort.IntsAreSorted(order) {
+			t.Errorf("RestForOne not shutting down in reverse start order: %v", order)
+			t.Log("log:", buf.String())
+		}
+	})
+	t.Run("simpleOneForOne", func(t *testing.T) {
+		var (
+			mu     sync.Mutex
+			order  []int
+			wgFunc sync.WaitGroup
+		)
+		wgFunc.Add(4)
+		f := func(i int) oversight.ChildProcess {
+			return func(ctx context.Context) error {
+				wgFunc.Done()
+				<-ctx.Done()
+				time.Sleep(time.Duration(i) * 100 * time.Millisecond)
+				mu.Lock()
+				order = append(order, i)
+				mu.Unlock()
+				return nil
+			}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		var buf bytes.Buffer
+		logger := log.New(&buf, "", 0)
+		supervise := oversight.Oversight(
+			oversight.WithLogger(logger),
+			oversight.NeverHalt(),
+			oversight.WithRestartStrategy(oversight.SimpleOneForOne()),
+			oversight.Processes(
+				f(1), f(2), f(3), f(4),
+				func(ctx context.Context) error {
+					wgFunc.Wait()
+					<-ctx.Done()
+					return nil
+				},
+			),
+		)
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			supervise(ctx)
+		}()
+		wgFunc.Wait()
+		cancel()
+		wg.Wait()
+		if ctx.Err() == context.DeadlineExceeded {
+			t.Error("should never reach deadline exceeded")
+		}
+		mu.Lock()
+		lenOrder := len(order)
+		mu.Unlock()
+		if lenOrder == 4 {
+			t.Errorf("SimpleOneForOne should not wait for goroutines: %v", order)
+			t.Log("log:", buf.String())
+		}
+	})
 }

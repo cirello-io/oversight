@@ -276,7 +276,9 @@ func (t *Tree) drain(ctx context.Context) error {
 	defer t.logger.Printf("clean up complete")
 	t.logger.Printf("context canceled (before start): %v", ctx.Err())
 	t.semaphore.Lock()
-	OneForAll()(t, 0)
+	for i := len(t.states) - 1; i >= 0; i-- {
+		t.strategy(t, i)
+	}
 	t.semaphore.Unlock()
 	for {
 		select {
