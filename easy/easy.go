@@ -132,9 +132,9 @@ func Delete(ctx context.Context, name string) error {
 
 // WithContext takes a context and prepare it to be used by easy oversight tree
 // package. Internally, it creates an oversight tree in OneForAll mode.
-func WithContext(ctx context.Context, opts ...oversight.TreeOption) context.Context {
+func WithContext(ctx context.Context, opts ...TreeOption) context.Context {
 	chosenName := fmt.Sprintf("tree-%d", rand.Uint64())
-	baseOpts := append([]oversight.TreeOption{
+	baseOpts := append([]TreeOption{
 		oversight.WithRestartStrategy(oversight.OneForAll()),
 		oversight.NeverHalt(),
 	}, opts...)
@@ -150,9 +150,16 @@ func WithContext(ctx context.Context, opts ...oversight.TreeOption) context.Cont
 }
 
 // WithLogger attaches a log function to the oversight tree.
-func WithLogger(logger oversight.Logger) oversight.TreeOption {
+func WithLogger(logger Logger) TreeOption {
 	return oversight.WithLogger(logger)
 }
+
+// Logger defines the interface for any logging facility to be compatible with
+// oversight trees.
+type Logger = oversight.Logger
+
+// TreeOption are applied to change the behavior of a Tree.
+type TreeOption = oversight.TreeOption
 
 func extractName(ctx context.Context) (string, bool) {
 	name, ok := ctx.Value(treeName).(string)
