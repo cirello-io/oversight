@@ -32,7 +32,7 @@ import (
 // ExampleTree_singlePermanent shows how to create a static tree of permanent
 // child processes.
 func ExampleTree_singlePermanent() {
-	supervise := oversight.Oversight(
+	supervise := oversight.New(
 		oversight.Processes(func(ctx context.Context) error {
 			select {
 			case <-ctx.Done():
@@ -46,7 +46,7 @@ func ExampleTree_singlePermanent() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	err := supervise(ctx)
+	err := supervise.Start(ctx)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -64,7 +64,7 @@ func TestTree_childProcessRestarts(t *testing.T) {
 		defer cancel()
 		const expectedRuns = 2
 		totalRuns := 0
-		supervise := oversight.Oversight(
+		supervise := oversight.New(
 			oversight.Process(oversight.ChildProcessSpecification{
 				Restart: oversight.Permanent(),
 				Start: func(ctx context.Context) error {
@@ -85,7 +85,7 @@ func TestTree_childProcessRestarts(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			supervise(ctx)
+			supervise.Start(ctx)
 		}()
 		wg.Wait()
 		if ctx.Err() == context.DeadlineExceeded {
@@ -102,7 +102,7 @@ func TestTree_childProcessRestarts(t *testing.T) {
 		defer cancel()
 		const expectedRuns = 2
 		totalRuns := 0
-		supervise := oversight.Oversight(
+		supervise := oversight.New(
 			oversight.Process(oversight.ChildProcessSpecification{
 				Restart: oversight.Transient(),
 				Start: func(ctx context.Context) error {
@@ -127,7 +127,7 @@ func TestTree_childProcessRestarts(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			supervise(ctx)
+			supervise.Start(ctx)
 		}()
 		wg.Wait()
 		if ctx.Err() == context.DeadlineExceeded {
@@ -144,7 +144,7 @@ func TestTree_childProcessRestarts(t *testing.T) {
 		defer cancel()
 		const unexpectedRuns = 2
 		totalRuns := 0
-		supervise := oversight.Oversight(
+		supervise := oversight.New(
 			oversight.Process(
 				oversight.ChildProcessSpecification{
 					Restart: oversight.Temporary(),
@@ -178,7 +178,7 @@ func TestTree_childProcessRestarts(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			supervise(ctx)
+			supervise.Start(ctx)
 		}()
 		wg.Wait()
 		if totalRuns >= unexpectedRuns || totalRuns == 0 {
@@ -195,7 +195,7 @@ func TestTree_treeRestarts(t *testing.T) {
 		defer cancel()
 		badSiblingRuns := 0
 		goodSiblingRuns := 0
-		supervise := oversight.Oversight(
+		supervise := oversight.New(
 			oversight.WithSpecification(2, 1*time.Second, oversight.OneForOne()),
 			oversight.Process(
 				oversight.ChildProcessSpecification{
@@ -226,7 +226,7 @@ func TestTree_treeRestarts(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			supervise(ctx)
+			supervise.Start(ctx)
 		}()
 		wg.Wait()
 		if ctx.Err() == context.DeadlineExceeded {
@@ -244,7 +244,7 @@ func TestTree_treeRestarts(t *testing.T) {
 		defer cancel()
 		badSiblingRuns := 0
 		goodSiblingRuns := 0
-		supervise := oversight.Oversight(
+		supervise := oversight.New(
 			oversight.WithSpecification(2, 1*time.Second, oversight.OneForAll()),
 			oversight.Process(
 				oversight.ChildProcessSpecification{
@@ -271,7 +271,7 @@ func TestTree_treeRestarts(t *testing.T) {
 				},
 			),
 		)
-		err := supervise(ctx)
+		err := supervise.Start(ctx)
 		if err != nil {
 			t.Error(err)
 		}
@@ -291,7 +291,7 @@ func TestTree_treeRestarts(t *testing.T) {
 		firstSiblingRuns := 0
 		badSiblingRuns := 0
 		goodSiblingRuns := 0
-		supervise := oversight.Oversight(
+		supervise := oversight.New(
 			oversight.WithSpecification(2, 1*time.Second, oversight.RestForOne()),
 			oversight.Process(
 				oversight.ChildProcessSpecification{
@@ -333,7 +333,7 @@ func TestTree_treeRestarts(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			supervise(ctx)
+			supervise.Start(ctx)
 		}()
 		wg.Wait()
 		if ctx.Err() == context.DeadlineExceeded {
@@ -375,7 +375,7 @@ func Test_nestedTree(t *testing.T) {
 		rootMu    sync.Mutex
 		rootCount = 0
 	)
-	root := oversight.Oversight(
+	root := oversight.New(
 		oversight.WithTree(leaf),
 		oversight.Processes(
 			func(ctx context.Context) error {
@@ -393,7 +393,7 @@ func Test_nestedTree(t *testing.T) {
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	root(ctx)
+	root.Start(ctx)
 	leafMu.Lock()
 	lc := leafCount
 	leafMu.Unlock()
@@ -442,7 +442,7 @@ func Test_customLogger(t *testing.T) {
 	defer cancel()
 	var buf bytes.Buffer
 	logger := log.New(&buf, "", 0)
-	oversight.Oversight(
+	supervise := oversight.New(
 		oversight.WithLogger(logger),
 		oversight.Processes(
 			func(ctx context.Context) error {
@@ -450,7 +450,8 @@ func Test_customLogger(t *testing.T) {
 				return nil
 			},
 		),
-	)(ctx)
+	)
+	supervise.Start(ctx)
 	content := buf.String()
 	expectedLog := strings.Contains(content, "child started") && strings.Contains(content, "child done")
 	if !expectedLog {
@@ -464,7 +465,7 @@ func Test_childProcTimeout(t *testing.T) {
 	blockedCtx, blockedCancel := context.WithCancel(context.Background())
 	defer blockedCancel()
 	started := make(chan struct{})
-	tree := oversight.Oversight(
+	supervise := oversight.New(
 		oversight.Process(oversight.ChildProcessSpecification{
 			Name:    "timed out childproc",
 			Restart: oversight.Temporary(),
@@ -490,7 +491,7 @@ func Test_childProcTimeout(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		defer t.Log("tree stopped")
-		err := tree(ctx)
+		err := supervise.Start(ctx)
 		if err != nil {
 			t.Log(err)
 		}
@@ -839,7 +840,7 @@ func TestTree_shutdownOrder(t *testing.T) {
 		defer cancel()
 		var buf bytes.Buffer
 		logger := log.New(&buf, "", 0)
-		supervise := oversight.Oversight(
+		supervise := oversight.New(
 			oversight.WithLogger(logger),
 			oversight.NeverHalt(),
 			oversight.WithRestartStrategy(oversight.OneForOne()),
@@ -856,7 +857,7 @@ func TestTree_shutdownOrder(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			supervise(ctx)
+			supervise.Start(ctx)
 		}()
 		wgFunc.Wait()
 		cancel()
@@ -891,7 +892,7 @@ func TestTree_shutdownOrder(t *testing.T) {
 		defer cancel()
 		var buf bytes.Buffer
 		logger := log.New(&buf, "", 0)
-		supervise := oversight.Oversight(
+		supervise := oversight.New(
 			oversight.WithLogger(logger),
 			oversight.NeverHalt(),
 			oversight.WithRestartStrategy(oversight.OneForAll()),
@@ -908,7 +909,7 @@ func TestTree_shutdownOrder(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			supervise(ctx)
+			supervise.Start(ctx)
 		}()
 		wgFunc.Wait()
 		cancel()
@@ -943,7 +944,7 @@ func TestTree_shutdownOrder(t *testing.T) {
 		defer cancel()
 		var buf bytes.Buffer
 		logger := log.New(&buf, "", 0)
-		supervise := oversight.Oversight(
+		supervise := oversight.New(
 			oversight.WithLogger(logger),
 			oversight.NeverHalt(),
 			oversight.WithRestartStrategy(oversight.RestForOne()),
@@ -960,7 +961,7 @@ func TestTree_shutdownOrder(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			supervise(ctx)
+			supervise.Start(ctx)
 		}()
 		wgFunc.Wait()
 		cancel()
@@ -995,7 +996,7 @@ func TestTree_shutdownOrder(t *testing.T) {
 		defer cancel()
 		var buf bytes.Buffer
 		logger := log.New(&buf, "", 0)
-		supervise := oversight.Oversight(
+		supervise := oversight.New(
 			oversight.WithLogger(logger),
 			oversight.NeverHalt(),
 			oversight.WithRestartStrategy(oversight.SimpleOneForOne()),
@@ -1012,7 +1013,7 @@ func TestTree_shutdownOrder(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			supervise(ctx)
+			supervise.Start(ctx)
 		}()
 		wgFunc.Wait()
 		cancel()

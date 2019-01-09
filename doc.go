@@ -17,7 +17,7 @@
 //
 // Refer to: http://erlang.org/doc/design_principles/sup_princ.html
 //
-//     supervise := oversight.Oversight(
+//     supervisor := oversight.New(
 //     	oversight.Processes(func(ctx context.Context) error {
 //     		select {
 //     		case <-ctx.Done():
@@ -30,7 +30,7 @@
 //     )
 //     ctx, cancel := context.WithCancel(context.Background())
 //     defer cancel()
-//     if err := supervise(ctx); err != nil {
+//     if err := supervisor.Start(ctx); err != nil {
 //     	log.Fatal(err)
 //     }
 //

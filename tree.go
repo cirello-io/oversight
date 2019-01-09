@@ -52,12 +52,6 @@ var ErrInvalidChildProcessType = errors.New("invalid child process type")
 // ErrInvalidConfiguration is returned when tree has invalid settings.
 var ErrInvalidConfiguration = errors.New("invalid tree configuration")
 
-// Oversight creates and ignites a supervisor tree.
-func Oversight(opts ...TreeOption) ChildProcess {
-	t := New(opts...)
-	return t.Start
-}
-
 // Tree is the supervisor tree proper.
 type Tree struct {
 	// MaxR is the maximum number of restarts before the oversight tree

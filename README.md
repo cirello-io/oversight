@@ -18,7 +18,7 @@ http://godoc.org/cirello.io/oversight
 
 ## Quickstart
 ```
-supervise := oversight.Oversight(
+supervise := oversight.New(
 	oversight.Processes(func(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
@@ -32,7 +32,7 @@ supervise := oversight.Oversight(
 
 ctx, cancel := context.WithCancel(context.Background())
 defer cancel()
-if err := supervise(ctx); err != nil {
+if err := supervise.Start(ctx); err != nil {
 	log.Fatal(err)
 }
 ```
