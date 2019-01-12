@@ -4,8 +4,7 @@
 [![GoDoc](https://godoc.org/cirello.io/oversight?status.svg)](https://godoc.org/cirello.io/oversight)
 [![gocover.io](https://gocover.io/_badge/cirello.io/oversight)](https://gocover.io/cirello.io/oversight)
 [![Go Report Card](https://goreportcard.com/badge/github.com/ucirello/oversight)](https://goreportcard.com/report/github.com/ucirello/oversight)
-
-This repository is covered by this [SLA](https://github.com/ucirello/public/blob/master/SLA.md).
+[![SLA](https://img.shields.io/badge/SLA-95%25-brightgreen.svg)](https://github.com/ucirello/public/blob/master/SLA.md)
 
 Package oversight makes a complete implementation of the Erlang supervision
 trees.
