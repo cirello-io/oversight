@@ -772,9 +772,9 @@ func Test_simpleInterface(t *testing.T) {
 
 func Test_invalidTreeConfiguration(t *testing.T) {
 	trees := []*oversight.Tree{
-		&oversight.Tree{MaxR: -2, MaxT: -1},
-		&oversight.Tree{MaxR: -1, MaxT: -1},
-		&oversight.Tree{MaxR: 0, MaxT: -1},
+		{MaxR: -2, MaxT: -1},
+		{MaxR: -1, MaxT: -1},
+		{MaxR: 0, MaxT: -1},
 	}
 	for _, tree := range trees {
 		if err := tree.Start(context.Background()); err != oversight.ErrInvalidConfiguration {
