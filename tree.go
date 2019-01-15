@@ -54,20 +54,6 @@ var ErrInvalidConfiguration = errors.New("invalid tree configuration")
 
 // Tree is the supervisor tree proper.
 type Tree struct {
-	// MaxR is the maximum number of restarts before the oversight tree
-	// gives up and halts. Set to -1 to prevent the tree from halting.
-	// Default value is DefaultMaxR.
-	MaxR int
-	// MaxT is the maximum time duration before the counted restarts are
-	// thrown away.
-	// Default value is DefaultMaxT.
-	MaxT time.Duration
-	// Restart strategy defines how the oversight tree handle individual
-	// child processes errors (OneForOne, OneForAll, RestForOne and
-	// SimpleOneForOne).
-	// Default value is OneForOne()
-	Restart Strategy
-
 	initializeOnce sync.Once
 	stopped        chan struct{}
 
@@ -94,10 +80,10 @@ type Tree struct {
 // New creates a new oversight (supervisor) tree with the applied options.
 func New(opts ...TreeOption) *Tree {
 	t := &Tree{}
-	t.init()
 	for _, opt := range opts {
 		opt(t)
 	}
+	t.init()
 	return t
 }
 
@@ -105,14 +91,11 @@ func (t *Tree) init() {
 	t.initializeOnce.Do(func() {
 		t.semaphore.Lock()
 		defer t.semaphore.Unlock()
-		t.maxR = t.MaxR
-		t.maxT = t.MaxT
 		isValidConfiguration := t.maxR >= -1 && t.maxT >= 0
 		if !isValidConfiguration {
 			t.err = ErrInvalidConfiguration
 			return
 		}
-		t.strategy = t.Restart
 		t.processChanged = make(chan struct{}, 1)
 		if t.maxR == 0 && t.maxT == 0 {
 			DefaultRestartIntensity()(t)
@@ -120,7 +103,9 @@ func (t *Tree) init() {
 		if t.strategy == nil {
 			DefaultRestartStrategy()(t)
 		}
-		t.logger = log.New(ioutil.Discard, "", 0)
+		if t.logger == nil {
+			t.logger = log.New(ioutil.Discard, "", 0)
+		}
 		t.processIndex = make(map[string]int)
 		t.stopped = make(chan struct{})
 		t.failure = make(chan int)

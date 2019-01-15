@@ -745,38 +745,17 @@ func Test_operationsOnDeadTree(t *testing.T) {
 	}
 }
 
-func Test_simpleInterface(t *testing.T) {
-	t.Parallel()
-	var treeRan, subTreeRan bool
-	var tree oversight.Tree
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	tree.Add(func(ctx context.Context) error {
-		treeRan = true
-		return nil
-	})
-	subtree := &oversight.Tree{
-		MaxR:    -1,
-		Restart: oversight.OneForAll(),
-	}
-	subtree.Add(func(ctx context.Context) error {
-		subTreeRan = true
-		return nil
-	})
-	tree.Add(subtree)
-	tree.Start(ctx)
-	if !treeRan || !subTreeRan {
-		t.Fatalf("forest of trees did not run correctly: %v %v", treeRan, subTreeRan)
-	}
-}
-
 func Test_invalidTreeConfiguration(t *testing.T) {
-	trees := []*oversight.Tree{
-		{MaxR: -2, MaxT: -1},
-		{MaxR: -1, MaxT: -1},
-		{MaxR: 0, MaxT: -1},
+	specs := []struct {
+		maxR int
+		maxT time.Duration
+	}{
+		{maxR: -2, maxT: -1},
+		{maxR: -1, maxT: -1},
+		{maxR: 0, maxT: -1},
 	}
-	for _, tree := range trees {
+	for _, spec := range specs {
+		tree := oversight.New(oversight.WithRestartIntensity(spec.maxR, spec.maxT))
 		if err := tree.Start(context.Background()); err != oversight.ErrInvalidConfiguration {
 			t.Errorf("unexpected error for an invalid configuration: %v", err)
 		}
@@ -1029,4 +1008,28 @@ func TestTree_shutdownOrder(t *testing.T) {
 			t.Log("log:", buf.String())
 		}
 	})
+}
+
+func Test_neverHalt(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	restarts := 0
+	supervise := oversight.New(
+		oversight.NeverHalt(),
+		oversight.Processes(
+			func(ctx context.Context) error {
+				if restarts >= 10 {
+					cancel()
+					return nil
+				}
+				restarts++
+				return nil
+			},
+		),
+	)
+	err := supervise.Start(ctx)
+	if err == oversight.ErrTooManyFailures {
+		t.Fatal("should not see ErrTooManyFailures")
+	}
 }

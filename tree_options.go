@@ -93,6 +93,7 @@ func Processes(processes ...ChildProcess) TreeOption {
 // never reset the child process list.
 func Process(specs ...ChildProcessSpecification) TreeOption {
 	return func(t *Tree) {
+		t.init()
 		for _, spec := range specs {
 			id := len(t.processes) + 1
 			t.states = append(t.states, state{
