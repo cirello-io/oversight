@@ -27,7 +27,7 @@ its context.
 		defer cancel()
 		// use cancel() to stop the oversight
 		ctx = oversight.WithContext(ctx)
-		oversight.Add(ctx, func(ctx context.Context) {
+		oversight.Add(ctx, func(ctx context.Context) error {
 			// ...
 		})
 	}
