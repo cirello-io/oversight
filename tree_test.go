@@ -600,7 +600,6 @@ func Test_terminateChildProc(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			defer t.Log("tree stopped")
 			tree.Start(ctx)
 		}()
 		<-processStarted
