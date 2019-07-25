@@ -84,12 +84,11 @@ func (r *state) setErr(err error, restart bool) {
 
 func (r *state) setFailed() {
 	r.mu.Lock()
+	defer r.mu.Unlock()
 	if r.state == Done {
-		r.mu.Unlock()
 		return
 	}
 	r.state = Failed
-	r.mu.Unlock()
 }
 
 // ChildProcessSpecification provides the complete interface to configure how
