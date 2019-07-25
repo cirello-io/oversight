@@ -158,20 +158,22 @@ func (t *Tree) Start(rootCtx context.Context) error {
 
 		This is not a line-by-line of Erlang's supervisor module because
 		functional programming patterns are not the most efficient
-		idioms for Go programs. I have referred to Erlang's
+		idioms in Go programs. I have referred to Erlang's
 		supervisor.erl and its Elixir cousin's supervisor.ex to how this
-		implementation should behave. The design principles document for
-		Erlang outlines a lot of how it works, but leaves significant
-		gaps that only the source code answers.
+		implementation should behave. Erlang's design principles
+		document outlines a lot of how it works, but leaves significant
+		gaps that only the source code can address.
 
 		This supervisor tree has one loop divided in two phases:
-		1 - differential process start according to the restart definition.
-		2 - failure capture with application of termination strategy.
+		1 - differential processes start according to their restart
+		definition.
+		2 - capture child processes failures and apply the termination
+		strategy.
 
 		The definition of failure and termination strategy will be
 		presented shortly.
 
-		1 - Differential process start
+		1 - Child processes start
 
 		When the oversight tree is configured, it takes each declared
 		child process and create a state to represent its lifecyle.
@@ -186,7 +188,7 @@ func (t *Tree) Start(rootCtx context.Context) error {
 		channel signals that they can run and the second phase starts.
 
 
-		2 - Capture failure and apply termination strategy.
+		2 - Fail, recovery and termination
 
 		Each child process is given the access to a channel to notify
 		failures. When one of the child processes fails, the oversight
