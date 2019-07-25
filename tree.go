@@ -318,8 +318,7 @@ func (t *Tree) handleTreeChanges(ctx context.Context, cancel context.CancelFunc)
 	}
 }
 
-func (t *Tree) startChildProcess(ctx context.Context, processID int,
-	p ChildProcessSpecification, startSemaphore <-chan struct{}) {
+func (t *Tree) startChildProcess(ctx context.Context, processID int, p ChildProcessSpecification, startSemaphore <-chan struct{}) {
 	childCtx, childWg := t.plugStop(ctx, processID, p)
 	go func(processID int, p ChildProcessSpecification) {
 		defer childWg.Done()
