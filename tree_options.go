@@ -75,9 +75,7 @@ func DefaultMaximumRestartIntensity() TreeOption {
 //
 // Deprecated in favor of DefaultMaximumRestartIntensity.
 func DefaultRestartIntensity() TreeOption {
-	return func(t *Tree) {
-		t.maxR, t.maxT = DefaultMaxR, DefaultMaxT
-	}
+	return DefaultMaximumRestartIntensity()
 }
 
 // WithRestartStrategy defines a custom restart strategy for the supervisor
