@@ -98,7 +98,7 @@ func (t *Tree) init() {
 		}
 		t.processChanged = make(chan struct{}, 1)
 		if t.maxR == 0 && t.maxT == 0 {
-			DefaultRestartIntensity()(t)
+			DefaultMaximumRestartIntensity()(t)
 		}
 		if t.strategy == nil {
 			DefaultRestartStrategy()(t)
