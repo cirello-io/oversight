@@ -56,14 +56,10 @@ type state struct {
 	stop  func()
 }
 
-func (r *state) current() state {
+func (r *state) currentChildProcessState() ChildProcessState {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return state{
-		state: r.state,
-		err:   r.err,
-		stop:  r.stop,
-	}
+	return r.state
 }
 
 func (r *state) setRunning(stop func()) {
