@@ -42,7 +42,7 @@ func WithMaximumRestartIntensity(maxR int, maxT time.Duration) TreeOption {
 }
 
 // WithRestartIntensity is an alias for WithMaximumRestartIntensity.
-// Deprecated in favor of
+// Deprecated in favor of WithMaximumRestartIntensity.
 func WithRestartIntensity(maxR int, maxT time.Duration) TreeOption {
 	return WithMaximumRestartIntensity(maxR, maxT)
 }
