@@ -60,10 +60,12 @@ const (
 	DefaultMaxT = 5 * time.Second
 )
 
-// DefaultRestartIntensity redefines the tolerance for failures in the
+// DefaultMaximumRestartIntensity redefines the tolerance for failures in the
 // supervisor tree. It defaults to 1 restart (maxR) in the preceding 5 seconds
 // (maxT).
-func DefaultRestartIntensity() TreeOption {
+//
+// Refer to http://erlang.org/doc/design_principles/sup_princ.html#tuning-the-intensity-and-period
+func DefaultMaximumRestartIntensity() TreeOption {
 	return func(t *Tree) {
 		t.maxR, t.maxT = DefaultMaxR, DefaultMaxT
 	}
