@@ -26,17 +26,25 @@ type TreeOption func(*Tree)
 // strategy for the instance of oversight.
 func WithSpecification(maxR int, maxT time.Duration, strategy Strategy) TreeOption {
 	return func(t *Tree) {
-		WithRestartIntensity(maxR, maxT)(t)
+		WithMaximumRestartIntensity(maxR, maxT)(t)
 		WithRestartStrategy(strategy)(t)
 	}
 }
 
-// WithRestartIntensity defines a custom tolerance for failures in the
+// WithMaximumRestartIntensity defines a custom tolerance for failures in the
 // supervisor tree.
-func WithRestartIntensity(maxR int, maxT time.Duration) TreeOption {
+//
+// Refer to http://erlang.org/doc/design_principles/sup_princ.html#maximum-restart-intensity
+func WithMaximumRestartIntensity(maxR int, maxT time.Duration) TreeOption {
 	return func(t *Tree) {
 		t.maxR, t.maxT = maxR, maxT
 	}
+}
+
+// WithRestartIntensity is an alias for WithMaximumRestartIntensity.
+// Deprecated in favor of
+func WithRestartIntensity(maxR int, maxT time.Duration) TreeOption {
+	return WithMaximumRestartIntensity(maxR, maxT)
 }
 
 // NeverHalt will configure the oversight tree to never stop in face of failure.
