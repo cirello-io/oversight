@@ -1040,7 +1040,7 @@ func Test_aliases(t *testing.T) {
 		defer cancel()
 		restarts := 0
 		supervise := oversight.New(
-			oversight.DefaultMaximumRestartIntensity(),
+			oversight.DefaultRestartIntensity(),
 			oversight.Processes(
 				func(ctx context.Context) error {
 					if restarts >= 10 {
