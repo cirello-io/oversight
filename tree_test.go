@@ -1032,3 +1032,51 @@ func Test_neverHalt(t *testing.T) {
 		t.Fatal("should not see ErrTooManyFailures")
 	}
 }
+
+func Test_aliases(t *testing.T) {
+	t.Parallel()
+	t.Run("DefaultRestartIntensity", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		restarts := 0
+		supervise := oversight.New(
+			oversight.DefaultMaximumRestartIntensity(),
+			oversight.Processes(
+				func(ctx context.Context) error {
+					if restarts >= 10 {
+						cancel()
+						return nil
+					}
+					restarts++
+					return nil
+				},
+			),
+		)
+		err := supervise.Start(ctx)
+		if err != oversight.ErrTooManyFailures {
+			t.Fatal("expected error missing:", err)
+		}
+	})
+	t.Run("WithRestartIntensity", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		restarts := 0
+		supervise := oversight.New(
+			oversight.WithRestartIntensity(oversight.DefaultMaxR, oversight.DefaultMaxT),
+			oversight.Processes(
+				func(ctx context.Context) error {
+					if restarts >= 10 {
+						cancel()
+						return nil
+					}
+					restarts++
+					return nil
+				},
+			),
+		)
+		err := supervise.Start(ctx)
+		if err != oversight.ErrTooManyFailures {
+			t.Fatal("expected error missing:", err)
+		}
+	})
+}
