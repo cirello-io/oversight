@@ -60,10 +60,6 @@ var (
 	trees map[string]*oversight.Tree // map of name to oversight.Tree
 )
 
-func init() {
-	trees = make(map[string]*oversight.Tree)
-}
-
 // Add inserts a supervised function to the attached tree, it launches
 // automatically. If the context is not correctly prepared, it returns an
 // ErrNoTreeAttached error. The restart policy is Permanent.
@@ -73,6 +69,9 @@ func Add(ctx context.Context, f oversight.ChildProcess, opts ...Option) (string,
 		return "", ErrNoTreeAttached
 	}
 	mu.Lock()
+	if trees == nil {
+		trees = make(map[string]*oversight.Tree)
+	}
 	svr, ok := trees[name]
 	mu.Unlock()
 	if !ok {
