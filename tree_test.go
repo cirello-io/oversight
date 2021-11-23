@@ -20,7 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"sort"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -794,221 +794,6 @@ func Test_multipleAdd(t *testing.T) {
 	tree.Start(ctx)
 }
 
-func TestTree_shutdownOrder(t *testing.T) {
-	t.Parallel()
-	t.Run("oneForOne", func(t *testing.T) {
-		var (
-			mu     sync.Mutex
-			order  []int
-			wgFunc sync.WaitGroup
-		)
-		wgFunc.Add(4)
-		f := func(i int) oversight.ChildProcess {
-			return func(ctx context.Context) error {
-				wgFunc.Done()
-				<-ctx.Done()
-				time.Sleep(time.Duration(i) * 100 * time.Millisecond)
-				mu.Lock()
-				order = append(order, i)
-				mu.Unlock()
-				return nil
-			}
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		var buf bytes.Buffer
-		logger := log.New(&buf, "", 0)
-		supervise := oversight.New(
-			oversight.WithLogger(logger),
-			oversight.NeverHalt(),
-			oversight.WithRestartStrategy(oversight.OneForOne()),
-			oversight.Processes(
-				f(1), f(2), f(3), f(4),
-				func(ctx context.Context) error {
-					wgFunc.Wait()
-					<-ctx.Done()
-					return nil
-				},
-			),
-		)
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			supervise.Start(ctx)
-		}()
-		wgFunc.Wait()
-		cancel()
-		wg.Wait()
-		if ctx.Err() == context.DeadlineExceeded {
-			t.Error("should never reach deadline exceeded")
-		}
-		if !sort.IntsAreSorted(order) {
-			t.Errorf("OneForOne not shutting down in reverse start order: %v", order)
-			t.Log("log:", buf.String())
-		}
-	})
-	t.Run("oneForAll", func(t *testing.T) {
-		var (
-			mu     sync.Mutex
-			order  []int
-			wgFunc sync.WaitGroup
-		)
-		wgFunc.Add(4)
-		f := func(i int) oversight.ChildProcess {
-			return func(ctx context.Context) error {
-				wgFunc.Done()
-				<-ctx.Done()
-				time.Sleep(time.Duration(i) * 100 * time.Millisecond)
-				mu.Lock()
-				order = append(order, i)
-				mu.Unlock()
-				return nil
-			}
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		var buf bytes.Buffer
-		logger := log.New(&buf, "", 0)
-		supervise := oversight.New(
-			oversight.WithLogger(logger),
-			oversight.NeverHalt(),
-			oversight.WithRestartStrategy(oversight.OneForAll()),
-			oversight.Processes(
-				f(1), f(2), f(3), f(4),
-				func(ctx context.Context) error {
-					wgFunc.Wait()
-					<-ctx.Done()
-					return nil
-				},
-			),
-		)
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			supervise.Start(ctx)
-		}()
-		wgFunc.Wait()
-		cancel()
-		wg.Wait()
-		if ctx.Err() == context.DeadlineExceeded {
-			t.Error("should never reach deadline exceeded")
-		}
-		if !sort.IntsAreSorted(order) {
-			t.Errorf("OneForAll not shutting down in reverse start order: %v", order)
-			t.Log("log:", buf.String())
-		}
-	})
-	t.Run("restForOne", func(t *testing.T) {
-		var (
-			mu     sync.Mutex
-			order  []int
-			wgFunc sync.WaitGroup
-		)
-		wgFunc.Add(4)
-		f := func(i int) oversight.ChildProcess {
-			return func(ctx context.Context) error {
-				wgFunc.Done()
-				<-ctx.Done()
-				time.Sleep(time.Duration(i) * 100 * time.Millisecond)
-				mu.Lock()
-				order = append(order, i)
-				mu.Unlock()
-				return nil
-			}
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		var buf bytes.Buffer
-		logger := log.New(&buf, "", 0)
-		supervise := oversight.New(
-			oversight.WithLogger(logger),
-			oversight.NeverHalt(),
-			oversight.WithRestartStrategy(oversight.RestForOne()),
-			oversight.Processes(
-				f(1), f(2), f(3), f(4),
-				func(ctx context.Context) error {
-					wgFunc.Wait()
-					<-ctx.Done()
-					return nil
-				},
-			),
-		)
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			supervise.Start(ctx)
-		}()
-		wgFunc.Wait()
-		cancel()
-		wg.Wait()
-		if ctx.Err() == context.DeadlineExceeded {
-			t.Error("should never reach deadline exceeded")
-		}
-		if !sort.IntsAreSorted(order) {
-			t.Errorf("RestForOne not shutting down in reverse start order: %v", order)
-			t.Log("log:", buf.String())
-		}
-	})
-	t.Run("simpleOneForOne", func(t *testing.T) {
-		var (
-			mu     sync.Mutex
-			order  []int
-			wgFunc sync.WaitGroup
-		)
-		wgFunc.Add(4)
-		f := func(i int) oversight.ChildProcess {
-			return func(ctx context.Context) error {
-				wgFunc.Done()
-				<-ctx.Done()
-				time.Sleep(time.Duration(i) * 100 * time.Millisecond)
-				mu.Lock()
-				order = append(order, i)
-				mu.Unlock()
-				return nil
-			}
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		var buf bytes.Buffer
-		logger := log.New(&buf, "", 0)
-		supervise := oversight.New(
-			oversight.WithLogger(logger),
-			oversight.NeverHalt(),
-			oversight.WithRestartStrategy(oversight.SimpleOneForOne()),
-			oversight.Processes(
-				f(1), f(2), f(3), f(4),
-				func(ctx context.Context) error {
-					wgFunc.Wait()
-					<-ctx.Done()
-					return nil
-				},
-			),
-		)
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			supervise.Start(ctx)
-		}()
-		wgFunc.Wait()
-		cancel()
-		wg.Wait()
-		if ctx.Err() == context.DeadlineExceeded {
-			t.Error("should never reach deadline exceeded")
-		}
-		mu.Lock()
-		lenOrder := len(order)
-		mu.Unlock()
-		if lenOrder == 4 {
-			t.Errorf("SimpleOneForOne should not wait for goroutines: %v", order)
-			t.Log("log:", buf.String())
-		}
-	})
-}
-
 func Test_neverHalt(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1126,4 +911,149 @@ func Test_dynamicNesting(t *testing.T) {
 	if err != nil && err != oversight.ErrNoChildProcessLeft {
 		t.Fatal("unexpected error:", err)
 	}
+}
+
+func TestTree_shutdownOrder(t *testing.T) {
+	t.Parallel()
+	t.Run("regular", func(t *testing.T) {
+		var (
+			mu          sync.Mutex
+			gotOrder    []string
+			treeStarted = make(chan struct{})
+		)
+		var wg sync.WaitGroup
+		f := func(ctx context.Context) error {
+			defer wg.Done()
+			<-ctx.Done()
+			mu.Lock()
+			gotOrder = append(gotOrder, oversight.ChildProcessName(ctx))
+			mu.Unlock()
+			return nil
+		}
+		tree := oversight.New()
+		for i := 0; i < 4; i++ {
+			wg.Add(1)
+			tree.Add(oversight.ChildProcessSpecification{
+				Name:    fmt.Sprint("child-", i),
+				Restart: oversight.Temporary(),
+				Start:   f,
+			})
+		}
+		tree.Add(oversight.ChildProcessSpecification{
+			Name:    "start",
+			Restart: oversight.Temporary(),
+			Start: func(context.Context) error {
+				close(treeStarted)
+				return nil
+			},
+		})
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			tree.Start(ctx)
+		}()
+		<-treeStarted
+		tree.GracefulShutdown(context.Background())
+		wg.Wait()
+		expectedOrder := []string{"child-3", "child-2", "child-1", "child-0"}
+		if !reflect.DeepEqual(expectedOrder, gotOrder) {
+			t.Error("unexpected shutdown order:", gotOrder)
+		}
+	})
+	t.Run("aborted", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer shutdownCancel()
+		var (
+			mu          sync.Mutex
+			gotOrder    []string
+			treeStarted = make(chan struct{})
+		)
+		var wg sync.WaitGroup
+		f := func(ctx context.Context) error {
+			defer wg.Done()
+			<-ctx.Done()
+			select {
+			case <-shutdownCtx.Done():
+			default:
+				mu.Lock()
+				gotOrder = append(gotOrder, oversight.ChildProcessName(ctx))
+				mu.Unlock()
+				time.Sleep(10 * time.Second)
+			}
+			return nil
+		}
+		tree := oversight.New()
+		for i := 0; i < 4; i++ {
+			wg.Add(1)
+			tree.Add(oversight.ChildProcessSpecification{
+				Name:    fmt.Sprint("child-", i),
+				Restart: oversight.Temporary(),
+				Start:   f,
+			})
+		}
+		tree.Add(oversight.ChildProcessSpecification{
+			Name:    "start",
+			Restart: oversight.Temporary(),
+			Start: func(context.Context) error {
+				close(treeStarted)
+				return nil
+			},
+		})
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			tree.Start(ctx)
+		}()
+		<-treeStarted
+		tree.GracefulShutdown(shutdownCtx)
+		wg.Wait()
+		expectedOrder := []string{"child-3"}
+		if !reflect.DeepEqual(expectedOrder, gotOrder) {
+			t.Error("unexpected shutdown order:", gotOrder)
+		}
+	})
+	t.Run("errors", func(t *testing.T) {
+		t.Run("missing context", func(t *testing.T) {
+			var tree oversight.Tree
+			if err := tree.GracefulShutdown(nil); err != oversight.ErrMissingContext {
+				t.Error("expected error missing:", err)
+			}
+		})
+		t.Run("missing start", func(t *testing.T) {
+			var tree oversight.Tree
+			if err := tree.GracefulShutdown(context.Background()); err != oversight.ErrTreeNotRunning {
+				t.Error("expected error missing:", err)
+			}
+		})
+		t.Run("invalid configuration", func(t *testing.T) {
+			var tree oversight.Tree
+			tree.Add(oversight.ChildProcessSpecification{Name: "child", Start: func(context.Context) error { return nil }})
+			ctx, cancel := context.WithCancel(context.Background())
+			go func() { tree.Start(ctx) }()
+			time.Sleep(1 * time.Second)
+			tree.Delete("child")
+			cancel()
+			if err := tree.GracefulShutdown(context.Background()); err != oversight.ErrTreeNotRunning {
+				t.Error("expected error missing:", err)
+			}
+		})
+		t.Run("stopped tree", func(t *testing.T) {
+			var tree oversight.Tree
+			oversight.NeverHalt()(&tree)
+			tree.Add(oversight.ChildProcessSpecification{Name: "child", Start: func(context.Context) error { return nil }})
+			ctx, cancel := context.WithCancel(context.Background())
+			go func() { tree.Start(ctx) }()
+			time.Sleep(1 * time.Second)
+			cancel()
+			time.Sleep(1 * time.Second)
+			t.Log(tree.GetErr())
+			if err := tree.GracefulShutdown(context.Background()); err != oversight.ErrTreeNotRunning {
+				t.Error("expected error missing:", err)
+			}
+		})
+	})
 }

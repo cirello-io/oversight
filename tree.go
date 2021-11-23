@@ -52,6 +52,9 @@ var ErrInvalidChildProcessType = errors.New("invalid child process type")
 // ErrInvalidConfiguration is returned when tree has invalid settings.
 var ErrInvalidConfiguration = errors.New("invalid tree configuration")
 
+// ErrMissingContext is returned when a nil value is passed as context
+var ErrMissingContext = errors.New("missing context")
+
 type childProcess struct {
 	spec  *ChildProcessSpecification
 	state *state
@@ -80,6 +83,7 @@ type Tree struct {
 	failure               chan string // child process name
 	anyStartedProcessEver bool
 	restarter             *restart
+	gracefulCancel        context.CancelFunc
 }
 
 // New creates a new oversight (supervisor) tree with the applied options.
@@ -158,6 +162,9 @@ func (t *Tree) Add(spec interface{}) error {
 
 // Start ignites the supervisor tree.
 func (t *Tree) Start(rootCtx context.Context) error {
+	if rootCtx == nil {
+		return ErrMissingContext
+	}
 	/*
 		Theory of operation
 
@@ -246,6 +253,7 @@ func (t *Tree) Start(rootCtx context.Context) error {
 	}
 	ctx, cancel := context.WithCancel(rootCtx)
 	defer cancel()
+	t.gracefulCancel = cancel
 	for {
 		select {
 		case <-ctx.Done():
@@ -263,7 +271,9 @@ func (t *Tree) drain(ctx context.Context) error {
 	t.logger.Printf("context canceled (before start): %v", ctx.Err())
 	t.semaphore.Lock()
 	for i := len(t.childrenOrder) - 1; i >= 0; i-- {
-		t.strategy(t, i)
+		procName := t.childrenOrder[i]
+		t.children[procName].state.setFailed()
+		t.children[procName].state.stop()
 	}
 	t.semaphore.Unlock()
 	for {
@@ -464,6 +474,53 @@ func (t *Tree) Children() []State {
 		childProc.mu.Unlock()
 	}
 	return ret
+}
+
+// GracefulShutdown stops the tree in reverse order. If the tree is not started,
+// it returns ErrTreeNotRunning. If the given context is canceled, the shutdown
+// is aborted.
+func (t *Tree) GracefulShutdown(ctx context.Context) error {
+	if ctx == nil {
+		return ErrMissingContext
+	}
+	if t.gracefulCancel == nil {
+		return ErrTreeNotRunning
+	}
+	t.init()
+	if err := t.err(); err != nil {
+		return ErrTreeNotRunning
+	}
+	select {
+	case <-t.stopped:
+		return ErrTreeNotRunning
+	default:
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		t.semaphore.Lock()
+		defer t.semaphore.Unlock()
+		for i := len(t.childrenOrder) - 1; i >= 0; i-- {
+			if ctx.Err() != nil {
+				break
+			}
+			procName := t.childrenOrder[i]
+			t.children[procName].state.setFailed()
+			t.children[procName].state.stop()
+		}
+	}()
+	select {
+	case <-ctx.Done():
+		t.gracefulCancel()
+		return ctx.Err()
+	case <-done:
+		t.gracefulCancel()
+		return nil
+	}
+}
+
+func (t *Tree) GetErr() error {
+	return t.err()
 }
 
 func (t *Tree) err() error {
