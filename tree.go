@@ -69,7 +69,8 @@ type Tree struct {
 
 	logger Logger
 
-	err error
+	errorMu sync.Mutex
+	error   error
 
 	// internal loop management variables
 	failure               chan int
@@ -93,7 +94,7 @@ func (t *Tree) init() {
 		defer t.semaphore.Unlock()
 		isValidConfiguration := t.maxR >= -1 && t.maxT >= 0
 		if !isValidConfiguration {
-			t.err = ErrInvalidConfiguration
+			t.setErr(ErrInvalidConfiguration)
 			return
 		}
 		t.processChanged = make(chan struct{}, 1)
@@ -123,7 +124,7 @@ func (t *Tree) init() {
 // to fail with ErrInvalidChildProcessType.
 func (t *Tree) Add(spec interface{}) error {
 	t.init()
-	if t.err != nil {
+	if t.err() != nil {
 		return ErrTreeNotRunning
 	}
 	select {
@@ -236,8 +237,8 @@ func (t *Tree) Start(rootCtx context.Context) error {
 		contexts cancelations to propagate termination calls.
 	*/
 	t.init()
-	if t.err != nil {
-		return t.err
+	if err := t.err(); err != nil {
+		return err
 	}
 	ctx, cancel := context.WithCancel(rootCtx)
 	defer cancel()
@@ -265,7 +266,7 @@ func (t *Tree) drain(ctx context.Context) error {
 		select {
 		case <-t.processChanged:
 		default:
-			return t.err
+			return t.err()
 		}
 	}
 }
@@ -293,7 +294,7 @@ func (t *Tree) startChildProcesses(ctx context.Context, cancel context.CancelFun
 	t.semaphore.Unlock()
 	if !anyRunningProcess && t.anyStartedProcessEver {
 		t.logger.Printf("no child process left after start")
-		t.err = ErrNoChildProcessLeft
+		t.setErr(ErrNoChildProcessLeft)
 		cancel()
 	}
 }
@@ -313,7 +314,7 @@ func (t *Tree) handleTreeChanges(ctx context.Context, cancel context.CancelFunc)
 			for _, restart := range t.restarter.restarts {
 				t.logger.Println("-", restart)
 			}
-			t.err = ErrTooManyFailures
+			t.setErr(ErrTooManyFailures)
 			cancel()
 		}
 	}
@@ -371,7 +372,7 @@ func (t *Tree) plugStop(ctx context.Context, processID int, p ChildProcessSpecif
 // is going to fail with ErrTreeNotRunning.
 func (t *Tree) Terminate(name string) error {
 	t.init()
-	if t.err != nil {
+	if err := t.err(); err != nil {
 		return ErrTreeNotRunning
 	}
 	select {
@@ -446,4 +447,17 @@ func (t *Tree) Children() []State {
 		t.states[i].mu.Unlock()
 	}
 	return ret
+}
+
+func (t *Tree) err() error {
+	t.errorMu.Lock()
+	err := t.error
+	t.errorMu.Unlock()
+	return err
+}
+
+func (t *Tree) setErr(err error) {
+	t.errorMu.Lock()
+	t.error = err
+	t.errorMu.Unlock()
 }
