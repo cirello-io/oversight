@@ -196,7 +196,6 @@ func TestTree_treeRestarts(t *testing.T) {
 		badSiblingRuns := 0
 		goodSiblingRuns := 0
 		supervise := oversight.New(
-			oversight.WithLogger(log.Default()),
 			oversight.WithSpecification(2, 1*time.Second, oversight.OneForOne()),
 			oversight.Process(
 				oversight.ChildProcessSpecification{
