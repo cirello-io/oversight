@@ -24,8 +24,9 @@ type Strategy func(t *Tree, failedChildID int)
 // restarted.
 func OneForOne() Strategy {
 	return func(t *Tree, failedChildID int) {
-		t.states[failedChildID].setFailed()
-		t.states[failedChildID].stop()
+		procName := t.childrenOrder[failedChildID]
+		t.children[procName].state.setFailed()
+		t.children[procName].state.stop()
 	}
 }
 
@@ -34,9 +35,10 @@ func OneForOne() Strategy {
 // terminated one, are restarted.
 func OneForAll() Strategy {
 	return func(t *Tree, failedChildID int) {
-		for i := len(t.states) - 1; i >= 0; i-- {
-			t.states[i].setFailed()
-			t.states[i].stop()
+		for i := len(t.childrenOrder) - 1; i >= 0; i-- {
+			procName := t.childrenOrder[i]
+			t.children[procName].state.setFailed()
+			t.children[procName].state.stop()
 		}
 	}
 }
@@ -47,9 +49,10 @@ func OneForAll() Strategy {
 // child processes are restarted.
 func RestForOne() Strategy {
 	return func(t *Tree, failedChildID int) {
-		for i := len(t.states) - 1; i >= failedChildID; i-- {
-			t.states[i].setFailed()
-			t.states[i].stop()
+		for i := len(t.childrenOrder) - 1; i >= failedChildID; i-- {
+			procName := t.childrenOrder[i]
+			t.children[procName].state.setFailed()
+			t.children[procName].state.stop()
 		}
 	}
 }
@@ -58,7 +61,8 @@ func RestForOne() Strategy {
 // asynchronously.
 func SimpleOneForOne() Strategy {
 	return func(t *Tree, failedChildID int) {
-		t.states[failedChildID].setFailed()
-		go t.states[failedChildID].stop()
+		procName := t.childrenOrder[failedChildID]
+		t.children[procName].state.setFailed()
+		go t.children[procName].state.stop()
 	}
 }

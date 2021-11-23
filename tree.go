@@ -52,6 +52,11 @@ var ErrInvalidChildProcessType = errors.New("invalid child process type")
 // ErrInvalidConfiguration is returned when tree has invalid settings.
 var ErrInvalidConfiguration = errors.New("invalid tree configuration")
 
+type childProcess struct {
+	spec  *ChildProcessSpecification
+	state *state
+}
+
 // Tree is the supervisor tree proper.
 type Tree struct {
 	initializeOnce sync.Once
@@ -62,10 +67,9 @@ type Tree struct {
 	strategy       Strategy
 	maxR           int
 	maxT           time.Duration
-	processes      []ChildProcessSpecification
-	states         []state
-	processChanged chan struct{}  // indicates that some change to process slice has been made
-	processIndex   map[string]int // map of ChildProcessSpecification.Name to internal ID
+	children       map[string]childProcess // map of children name to child process
+	childrenOrder  []string
+	processChanged chan struct{} // indicates that some change to process slice has been made
 
 	logger Logger
 
@@ -73,7 +77,7 @@ type Tree struct {
 	error   error
 
 	// internal loop management variables
-	failure               chan int
+	failure               chan string // child process name
 	anyStartedProcessEver bool
 	restarter             *restart
 }
@@ -107,9 +111,9 @@ func (t *Tree) init() {
 		if t.logger == nil {
 			t.logger = log.New(ioutil.Discard, "", 0)
 		}
-		t.processIndex = make(map[string]int)
+		t.children = make(map[string]childProcess)
 		t.stopped = make(chan struct{})
-		t.failure = make(chan int)
+		t.failure = make(chan string)
 		t.restarter = &restart{
 			intensity: t.maxR,
 			period:    t.maxT,
@@ -258,7 +262,7 @@ func (t *Tree) drain(ctx context.Context) error {
 	defer t.logger.Printf("clean up complete")
 	t.logger.Printf("context canceled (before start): %v", ctx.Err())
 	t.semaphore.Lock()
-	for i := len(t.states) - 1; i >= 0; i-- {
+	for i := len(t.childrenOrder) - 1; i >= 0; i-- {
 		t.strategy(t, i)
 	}
 	t.semaphore.Unlock()
@@ -275,8 +279,9 @@ func (t *Tree) startChildProcesses(ctx context.Context, cancel context.CancelFun
 	t.semaphore.Lock()
 	anyRunningProcess := false
 	startSemaphore := make(chan struct{})
-	for i, p := range t.processes {
-		running := t.states[i].currentChildProcessState()
+	for i, procName := range t.childrenOrder {
+		childProc := t.children[procName]
+		running := childProc.state.currentChildProcessState()
 		switch running {
 		case Running:
 			anyRunningProcess = true
@@ -286,8 +291,8 @@ func (t *Tree) startChildProcesses(ctx context.Context, cancel context.CancelFun
 		default:
 			anyRunningProcess = true
 			t.anyStartedProcessEver = true
-			t.logger.Printf("starting %v", p.Name)
-			t.startChildProcess(ctx, i, p, startSemaphore)
+			t.logger.Printf("starting %v", childProc.spec.Name)
+			t.startChildProcess(ctx, i, childProc.spec, startSemaphore)
 		}
 	}
 	close(startSemaphore)
@@ -304,10 +309,16 @@ func (t *Tree) handleTreeChanges(ctx context.Context, cancel context.CancelFunc)
 	case <-ctx.Done():
 	case <-t.processChanged:
 		t.logger.Println("detected change in child processes list")
-	case failedChild := <-t.failure:
+	case failedChildName := <-t.failure:
 		t.semaphore.Lock()
-		t.logger.Printf("child process failure detected (%v)", t.processes[failedChild].Name)
-		t.strategy(t, failedChild)
+		for failedChildID, procName := range t.childrenOrder {
+			childProc := t.children[procName]
+			if failedChildName == childProc.spec.Name {
+				t.logger.Printf("child process failure detected (%v)", childProc.spec.Name)
+				t.strategy(t, failedChildID)
+				break
+			}
+		}
 		t.semaphore.Unlock()
 		if t.restarter.terminate(time.Now()) {
 			t.logger.Printf("too many failures detected:")
@@ -320,9 +331,9 @@ func (t *Tree) handleTreeChanges(ctx context.Context, cancel context.CancelFunc)
 	}
 }
 
-func (t *Tree) startChildProcess(ctx context.Context, processID int, p ChildProcessSpecification, startSemaphore <-chan struct{}) {
-	childCtx, childWg := t.plugStop(ctx, processID, p)
-	go func(processID int, p ChildProcessSpecification) {
+func (t *Tree) startChildProcess(ctx context.Context, processID int, p *ChildProcessSpecification, startSemaphore <-chan struct{}) {
+	childCtx, childWg, procState := t.plugStop(ctx, processID, p)
+	go func() {
 		defer childWg.Done()
 		<-startSemaphore
 		t.logger.Println(p.Name, "child started")
@@ -332,19 +343,22 @@ func (t *Tree) startChildProcess(ctx context.Context, processID int, p ChildProc
 			t.logger.Println(p.Name, "errored:", err)
 		}
 		restart := p.Restart(err)
-		t.setStateError(p.Name, err, restart)
+		procState.setErr(err, restart)
 		select {
 		case <-childCtx.Done():
-		case t.failure <- processID:
+		case t.failure <- p.Name:
 		}
-	}(processID, p)
+	}()
 }
 
-func (t *Tree) plugStop(ctx context.Context, processID int, p ChildProcessSpecification) (context.Context, *sync.WaitGroup) {
-	childCtx, childCancel := context.WithCancel(ctx)
+type oversightValue string
+
+func (t *Tree) plugStop(ctx context.Context, processID int, p *ChildProcessSpecification) (context.Context, *sync.WaitGroup, *state) {
+	childCtx, childCancel := context.WithCancel(context.WithValue(ctx, oversightValue("name"), p.Name))
 	var childWg sync.WaitGroup
 	childWg.Add(1)
-	t.states[processID].setRunning(func() {
+	childProc := t.children[p.Name]
+	childProc.state.setRunning(func() {
 		t.logger.Println(p.Name, "stopping")
 		stopCtx, stopCancel := p.Shutdown()
 		defer stopCancel()
@@ -361,7 +375,15 @@ func (t *Tree) plugStop(ctx context.Context, processID int, p ChildProcessSpecif
 			t.logger.Println(p.Name, "timeout")
 		}
 	})
-	return childCtx, &childWg
+	return childCtx, &childWg, childProc.state
+}
+
+// ChildProcessName reports the child process name if available in the context.
+func ChildProcessName(ctx context.Context) string {
+	if v := ctx.Value(oversightValue("name")); v != nil {
+		return v.(string)
+	}
+	return ""
 }
 
 // Terminate stop the named process. Terminated child processes do not count
@@ -381,32 +403,28 @@ func (t *Tree) Terminate(name string) error {
 	default:
 	}
 	t.semaphore.Lock()
-	id, ok := t.processIndex[name]
+	childProc, ok := t.children[name]
 	if !ok {
 		t.semaphore.Unlock()
 		return ErrUnknownProcess
 	}
-	t.states[id].mu.Lock()
-	state := t.states[id].state
-	stop := t.states[id].stop
+	procState := childProc.state
+	procState.mu.Lock()
+	state := procState.state
+	stop := procState.stop
 	if state != Running || stop == nil {
-		t.states[id].mu.Unlock()
+		procState.mu.Unlock()
 		t.semaphore.Unlock()
 		return ErrProcessNotRunning
 	}
-	t.states[id].state = Done
-	t.states[id].mu.Unlock()
+	procState.state = Done
+	procState.mu.Unlock()
 	t.semaphore.Unlock()
 	stop()
 	t.logger.Println("Terminate.processChanged start")
 	t.processChanged <- struct{}{}
 	t.logger.Println("Terminate.processChanged end")
 	return nil
-}
-
-func (t *Tree) setStateError(name string, err error, restart bool) {
-	processID := t.processIndex[name]
-	t.states[processID].setErr(err, restart)
 }
 
 // Delete stops the service in the oversight tree and remove from it. If the
@@ -420,12 +438,11 @@ func (t *Tree) Delete(name string) error {
 	}
 	t.semaphore.Lock()
 	defer t.semaphore.Unlock()
-	id := t.processIndex[name]
-	t.states = append(t.states[:id], t.states[id+1:]...)
-	t.processes = append(t.processes[:id], t.processes[id+1:]...)
-	t.processIndex = make(map[string]int)
-	for i, p := range t.processes {
-		t.processIndex[p.Name] = i
+	for id, childName := range t.childrenOrder {
+		if childName == name {
+			t.childrenOrder = append(t.childrenOrder[:id], t.childrenOrder[id+1:]...)
+			break
+		}
 	}
 	return nil
 }
@@ -436,15 +453,15 @@ func (t *Tree) Children() []State {
 	t.semaphore.Lock()
 	defer t.semaphore.Unlock()
 	ret := []State{}
-	for i := range t.states {
-		t.states[i].mu.Lock()
-		name := t.processes[i].Name
+	for _, procName := range t.childrenOrder {
+		childProc := t.children[procName].state
+		childProc.mu.Lock()
 		ret = append(ret, State{
-			Name:  name,
-			State: t.states[i].state,
-			Stop:  t.states[i].stop,
+			Name:  string(procName),
+			State: childProc.state,
+			Stop:  childProc.stop,
 		})
-		t.states[i].mu.Unlock()
+		childProc.mu.Unlock()
 	}
 	return ret
 }

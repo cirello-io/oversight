@@ -191,14 +191,16 @@ func TestTree_childProcessRestarts(t *testing.T) {
 func TestTree_treeRestarts(t *testing.T) {
 	t.Parallel()
 	t.Run("oneForOne", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		badSiblingRuns := 0
 		goodSiblingRuns := 0
 		supervise := oversight.New(
+			oversight.WithLogger(log.Default()),
 			oversight.WithSpecification(2, 1*time.Second, oversight.OneForOne()),
 			oversight.Process(
 				oversight.ChildProcessSpecification{
+					Name:    "first-child",
 					Restart: oversight.Permanent(),
 					Start: func(ctx context.Context) error {
 						t.Log("failed process should always restart...")
@@ -210,13 +212,12 @@ func TestTree_treeRestarts(t *testing.T) {
 					},
 				},
 				oversight.ChildProcessSpecification{
+					Name:    "second-child",
 					Restart: oversight.Permanent(),
 					Start: func(ctx context.Context) error {
 						t.Log("but sibling must stay untouched")
 						goodSiblingRuns++
-						select {
-						case <-ctx.Done():
-						}
+						<-ctx.Done()
 						return nil
 					},
 				},
@@ -233,7 +234,7 @@ func TestTree_treeRestarts(t *testing.T) {
 			t.Error("should never reach deadline exceeded")
 		}
 		if badSiblingRuns < 2 {
-			t.Error("the test did not run long enough")
+			t.Error("the test did not run long enough", badSiblingRuns)
 		}
 		if goodSiblingRuns != 1 {
 			t.Error("oneForOne should not terminate siblings")
@@ -1079,4 +1080,45 @@ func Test_aliases(t *testing.T) {
 			t.Fatal("expected error missing:", err)
 		}
 	})
+}
+
+func Test_dynamicNesting(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	tree := oversight.New(oversight.NeverHalt())
+	// The point of this test is to prove that the clockwork won't panic.
+	// The self-deletion of dynamically added children is, as of the time
+	// of this test, unspecified behavior.
+	tree.Add(oversight.ChildProcessSpecification{
+		Name:    "root",
+		Restart: oversight.Transient(),
+		Start: func(ctx context.Context) error {
+			for i := 0; i < 10; i++ {
+				tree.Add(oversight.ChildProcessSpecification{
+					Name:    "child",
+					Restart: oversight.Transient(),
+					Start: func(ctx context.Context) error {
+						realChildName := oversight.ChildProcessName(ctx)
+						t.Log("start", realChildName)
+						defer t.Log("done", realChildName)
+						select {
+						case <-ctx.Done():
+							return ctx.Err()
+						case <-time.After(1 * time.Second):
+							t.Log("deleting", realChildName)
+							_ = tree.Delete(realChildName)
+							return nil
+						}
+					},
+					Shutdown: oversight.Timeout(1 * time.Second),
+				})
+			}
+			return nil
+		},
+	})
+	err := tree.Start(ctx)
+	if err != nil && err != oversight.ErrNoChildProcessLeft {
+		t.Fatal("unexpected error:", err)
+	}
 }

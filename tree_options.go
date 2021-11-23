@@ -16,6 +16,7 @@ package oversight
 
 import (
 	"fmt"
+	"math/rand"
 	"time"
 )
 
@@ -112,16 +113,15 @@ func Process(specs ...ChildProcessSpecification) TreeOption {
 	return func(t *Tree) {
 		t.init()
 		for _, spec := range specs {
-			id := len(t.processes) + 1
-			t.states = append(t.states, state{
-				stop: func() {
-					t.logger.Println("stopped before start")
-				},
-			})
+			spec := spec
+			if spec.Start == nil {
+				panic("child process must always have a function")
+			}
+			id := rand.Int63()
 			if spec.Name == "" {
 				spec.Name = fmt.Sprintf("childproc %d", id)
 			}
-			if _, ok := t.processIndex[spec.Name]; ok {
+			if _, ok := t.children[spec.Name]; ok {
 				spec.Name += fmt.Sprint(" ", id)
 			}
 			if spec.Restart == nil {
@@ -130,11 +130,15 @@ func Process(specs ...ChildProcessSpecification) TreeOption {
 			if spec.Shutdown == nil {
 				spec.Shutdown = Timeout(DefaultChildProcessTimeout)
 			}
-			if spec.Start == nil {
-				panic("child process must always have a function")
+			t.children[spec.Name] = childProcess{
+				state: &state{
+					stop: func() {
+						t.logger.Println("stopped before start")
+					},
+				},
+				spec: &spec,
 			}
-			t.processes = append(t.processes, spec)
-			t.processIndex[spec.Name] = id - 1
+			t.childrenOrder = append(t.childrenOrder, spec.Name)
 		}
 	}
 }
