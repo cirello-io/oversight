@@ -957,6 +957,8 @@ func TestTree_shutdownOrder(t *testing.T) {
 		<-treeStarted
 		tree.GracefulShutdown(context.Background())
 		wg.Wait()
+		mu.Lock()
+		defer mu.Unlock()
 		expectedOrder := []string{"child-3", "child-2", "child-1", "child-0"}
 		if !reflect.DeepEqual(expectedOrder, gotOrder) {
 			t.Error("unexpected shutdown order:", gotOrder)
@@ -1012,6 +1014,8 @@ func TestTree_shutdownOrder(t *testing.T) {
 		tree.GracefulShutdown(shutdownCtx)
 		wg.Wait()
 		expectedOrder := []string{"child-3"}
+		mu.Lock()
+		defer mu.Unlock()
 		if !reflect.DeepEqual(expectedOrder, gotOrder) {
 			t.Error("unexpected shutdown order:", gotOrder)
 		}
