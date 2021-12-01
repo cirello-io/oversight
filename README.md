@@ -1,6 +1,5 @@
 # cirello.io/oversight
 
-[![travis-ci](https://api.travis-ci.org/cirello-io/oversight.svg?branch=master)](https://travis-ci.org/cirello-io/oversight)
 [![GoDoc](https://godoc.org/cirello.io/oversight?status.svg)](https://godoc.org/cirello.io/oversight)
 [![gocover.io](https://gocover.io/_badge/cirello.io/oversight)](https://gocover.io/cirello.io/oversight)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cirello-io/oversight)](https://goreportcard.com/report/github.com/cirello-io/oversight)
