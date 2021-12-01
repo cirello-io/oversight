@@ -1,6 +1,5 @@
 # cirello.io/oversight/easy
 
-[![travis-ci](https://api.travis-ci.org/cirello-io/oversight.svg?branch=master)](https://travis-ci.org/cirello-io/oversight)
 [![GoDoc](https://godoc.org/cirello.io/oversight/easy?status.svg)](https://godoc.org/cirello.io/oversight/easy)
 [![SLA](https://img.shields.io/badge/SLA-95%25-brightgreen.svg)](https://github.com/cirello-io/public/blob/master/SLA.md)
 
