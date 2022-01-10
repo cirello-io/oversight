@@ -57,7 +57,7 @@ var (
 	ErrNoTreeAttached = errors.New("no oversight tree attached to context")
 
 	mu    sync.Mutex
-	trees map[string]*oversight.Tree // map of name to oversight.Tree
+	trees = make(map[string]*oversight.Tree) // map of name to oversight.Tree
 )
 
 // Add inserts a supervised function to the attached tree, it launches
@@ -69,9 +69,6 @@ func Add(ctx context.Context, f oversight.ChildProcess, opts ...Option) (string,
 		return "", ErrNoTreeAttached
 	}
 	mu.Lock()
-	if trees == nil {
-		trees = make(map[string]*oversight.Tree)
-	}
 	svr, ok := trees[name]
 	mu.Unlock()
 	if !ok {
