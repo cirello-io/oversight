@@ -63,6 +63,8 @@ func SimpleOneForOne() Strategy {
 	return func(t *Tree, failedChildID int) {
 		procName := t.childrenOrder[failedChildID]
 		t.children[procName].state.setFailed()
-		go t.children[procName].state.stop()
+		// avoid dereferencing the stop pointer after the t.semaphore is released.
+		stop := t.children[procName].state.stop
+		go stop()
 	}
 }
