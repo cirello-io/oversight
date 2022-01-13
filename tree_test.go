@@ -1061,3 +1061,12 @@ func TestTree_shutdownOrder(t *testing.T) {
 		})
 	})
 }
+
+func TestPanicDoubleStart(t *testing.T) {
+	var tree oversight.Tree
+	oversight.NeverHalt()(&tree)
+	ctx, cancel := context.WithCancel(context.Background())
+	tree.Add(oversight.ChildProcessSpecification{Name: "child", Start: func(context.Context) error { cancel(); return nil }})
+	tree.Start(ctx)
+	tree.Start(ctx)
+}

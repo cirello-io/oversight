@@ -266,6 +266,11 @@ func (t *Tree) Start(rootCtx context.Context) error {
 }
 
 func (t *Tree) drain(ctx context.Context) error {
+	select {
+	case <-t.stopped:
+		return ErrTreeNotRunning
+	default:
+	}
 	close(t.stopped)
 	defer t.logger.Printf("clean up complete")
 	t.logger.Printf("context canceled (before start): %v", ctx.Err())
