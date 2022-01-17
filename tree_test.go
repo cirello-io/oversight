@@ -1063,10 +1063,43 @@ func TestTree_shutdownOrder(t *testing.T) {
 }
 
 func TestPanicDoubleStart(t *testing.T) {
+	t.Parallel()
 	var tree oversight.Tree
 	oversight.NeverHalt()(&tree)
 	ctx, cancel := context.WithCancel(context.Background())
 	tree.Add(oversight.ChildProcessSpecification{Name: "child", Start: func(context.Context) error { cancel(); return nil }})
 	tree.Start(ctx)
 	tree.Start(ctx)
+}
+
+func TestWaitAfterStart(t *testing.T) {
+	t.Parallel()
+	tree := oversight.New(oversight.NeverHalt())
+	var (
+		mu    sync.Mutex
+		count int
+	)
+	ctx, cancel := context.WithCancel(context.Background())
+	for i := 0; i < 10; i++ {
+		mu.Lock()
+		count++
+		mu.Unlock()
+		tree.Add(oversight.ChildProcessSpecification{
+			Start: func(ctx context.Context) error {
+				<-ctx.Done()
+				mu.Lock()
+				count--
+				mu.Unlock()
+				return nil
+			},
+			Restart: oversight.Temporary(),
+		})
+	}
+	time.AfterFunc(1*time.Second, cancel)
+	if err := tree.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatal("run returned before all children returned")
+	}
 }

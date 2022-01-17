@@ -133,10 +133,15 @@ func Transient() Restart { return func(err error) bool { return err != nil } }
 // are signaled to stop.
 type Shutdown func() (context.Context, context.CancelFunc)
 
+type shutdownContextValue string
+
+var detachableContext = shutdownContextValue("detachable")
+
 // Infinity will wait until the process naturally dies.
 func Infinity() Shutdown {
 	return func() (context.Context, context.CancelFunc) {
-		return context.WithCancel(context.Background())
+		ctx := context.WithValue(context.Background(), detachableContext, false)
+		return context.WithCancel(ctx)
 	}
 }
 
@@ -148,6 +153,7 @@ const DefaultChildProcessTimeout = 5 * time.Second
 // detaching from the winding process.
 func Timeout(d time.Duration) Shutdown {
 	return func() (context.Context, context.CancelFunc) {
-		return context.WithTimeout(context.Background(), d)
+		ctx := context.WithValue(context.Background(), detachableContext, true)
+		return context.WithTimeout(ctx, d)
 	}
 }

@@ -66,13 +66,14 @@ type Tree struct {
 	stopped        chan struct{}
 
 	// semaphore must be held when adding/deleting dynamic processes
-	semaphore      sync.Mutex
-	strategy       Strategy
-	maxR           int
-	maxT           time.Duration
-	children       map[string]childProcess // map of children name to child process
-	childrenOrder  []string
-	processChanged chan struct{} // indicates that some change to process slice has been made
+	semaphore         sync.Mutex
+	strategy          Strategy
+	maxR              int
+	maxT              time.Duration
+	children          map[string]childProcess // map of children name to child process
+	childrenOrder     []string
+	childrenWaitGroup sync.WaitGroup
+	processChanged    chan struct{} // indicates that some change to process slice has been made
 
 	logger Logger
 
@@ -251,6 +252,7 @@ func (t *Tree) Start(rootCtx context.Context) error {
 	if err := t.err(); err != nil {
 		return err
 	}
+	defer t.childrenWaitGroup.Wait()
 	ctx, cancel := context.WithCancel(rootCtx)
 	defer cancel()
 	t.gracefulCancel = cancel
@@ -348,7 +350,14 @@ func (t *Tree) handleTreeChanges(ctx context.Context, cancel context.CancelFunc)
 
 func (t *Tree) startChildProcess(ctx context.Context, processID int, p *ChildProcessSpecification, startSemaphore <-chan struct{}) {
 	childCtx, childWg, procState := t.plugStop(ctx, processID, p)
+	detachable := childCtx.Value(detachableContext) == true
+	if !detachable {
+		t.childrenWaitGroup.Add(1)
+	}
 	go func() {
+		if !detachable {
+			defer t.childrenWaitGroup.Done()
+		}
 		defer childWg.Done()
 		<-startSemaphore
 		t.logger.Println(p.Name, "child started")
@@ -369,13 +378,16 @@ func (t *Tree) startChildProcess(ctx context.Context, processID int, p *ChildPro
 type oversightValue string
 
 func (t *Tree) plugStop(ctx context.Context, processID int, p *ChildProcessSpecification) (context.Context, *sync.WaitGroup, *state) {
-	childCtx, childCancel := context.WithCancel(context.WithValue(ctx, oversightValue("name"), p.Name))
+	stopCtx, stopCancel := p.Shutdown()
+	baseCtx := ctx
+	baseCtx = context.WithValue(baseCtx, oversightValue("name"), p.Name)
+	baseCtx = context.WithValue(baseCtx, detachableContext, stopCtx.Value(detachableContext))
+	childCtx, childCancel := context.WithCancel(baseCtx)
 	var childWg sync.WaitGroup
 	childWg.Add(1)
 	childProc := t.children[p.Name]
 	childProc.state.setRunning(func() {
 		t.logger.Println(p.Name, "stopping")
-		stopCtx, stopCancel := p.Shutdown()
 		defer stopCancel()
 		wgComplete := make(chan struct{})
 		childCancel()
