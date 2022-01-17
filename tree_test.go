@@ -472,13 +472,9 @@ func Test_childProcTimeout(t *testing.T) {
 			Start: func(ctx context.Context) error {
 				started <- struct{}{}
 				t.Log("started")
-				select {
-				case <-ctx.Done():
-				}
+				<-ctx.Done()
 				t.Log("tree stop signal received")
-				select {
-				case <-blockedCtx.Done():
-				}
+				<-blockedCtx.Done()
 				return nil
 			},
 			Shutdown: oversight.Timeout(2 * time.Second),
