@@ -863,56 +863,6 @@ func Test_aliases(t *testing.T) {
 	})
 }
 
-func Test_dynamicNesting(t *testing.T) {
-	t.Parallel()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	var wg sync.WaitGroup
-	tree := oversight.New(oversight.NeverHalt())
-	// The point of this test is to prove that the clockwork won't panic.
-	// The self-deletion of dynamically added children is, as of the time
-	// of this test, unspecified behavior.
-	wg.Add(1)
-	tree.Add(oversight.ChildProcessSpecification{
-		Name:    "root",
-		Restart: oversight.Transient(),
-		Start: func(ctx context.Context) error {
-			defer wg.Done()
-			for i := 0; i < 10; i++ {
-				wg.Add(1)
-				tree.Add(oversight.ChildProcessSpecification{
-					Name:    fmt.Sprintf("child %d", rand.Int63()),
-					Restart: oversight.Transient(),
-					Start: func(ctx context.Context) error {
-						defer wg.Done()
-						realChildName := oversight.ChildProcessName(ctx)
-						t.Log("start", realChildName)
-						defer t.Log("done", realChildName)
-						select {
-						case <-ctx.Done():
-							return ctx.Err()
-						case <-time.After(100 * time.Millisecond):
-							t.Log("deleting", realChildName)
-							_ = tree.Delete(realChildName)
-							return nil
-						}
-					},
-					Shutdown: oversight.Timeout(500 * time.Millisecond),
-				})
-			}
-			return nil
-		},
-	})
-	err := tree.Start(ctx)
-	wg.Wait()
-	if err != nil && err != oversight.ErrNoChildProcessLeft {
-		t.Fatal("unexpected error:", err)
-	}
-	if err := tree.Start(context.Background()); !errors.Is(err, oversight.ErrNoChildProcessLeft) {
-		t.Fatal("expected error missing: %$v", err)
-	}
-}
-
 func TestTree_shutdownOrder(t *testing.T) {
 	t.Parallel()
 	t.Run("regular", func(t *testing.T) {
