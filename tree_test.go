@@ -1070,3 +1070,10 @@ func Test_errorLessChild(t *testing.T) {
 		t.Fatal("errorless function never called")
 	}
 }
+
+func TestEmptyChildProcessName(t *testing.T) {
+	got := oversight.ChildProcessName(context.Background())
+	if got != "" {
+		t.Fatal("unexpected child process name", got)
+	}
+}
