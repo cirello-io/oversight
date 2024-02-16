@@ -1087,3 +1087,13 @@ func TestEmptyContextTree(t *testing.T) {
 		t.Fatal("unexpected error", err)
 	}
 }
+
+func TestTerminateNoExistingChildProcess(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	tree := oversight.New(oversight.NeverHalt())
+	go tree.Start(ctx)
+	if err := tree.Terminate("404"); !errors.Is(err, oversight.ErrUnknownProcess) {
+		t.Fatal("unexpected error", err)
+	}
+}
