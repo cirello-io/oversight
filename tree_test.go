@@ -1055,6 +1055,8 @@ func TestWaitAfterStart(t *testing.T) {
 }
 
 func Test_errorLessChild(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	tree := oversight.New(oversight.NeverHalt())
 	var (
 		isDone = make(chan struct{})
@@ -1063,7 +1065,7 @@ func Test_errorLessChild(t *testing.T) {
 	tree.Add(func(ctx context.Context) {
 		done.Do(func() { close(isDone) })
 	})
-	go tree.Start(context.Background())
+	go tree.Start(ctx)
 	select {
 	case <-isDone:
 	case <-time.After(5 * time.Second):
