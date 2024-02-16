@@ -239,6 +239,57 @@ func TestTree_treeRestarts(t *testing.T) {
 			t.Error("oneForOne should not terminate siblings")
 		}
 	})
+	t.Run("simpleOneForOne", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		badSiblingRuns := 0
+		goodSiblingRuns := 0
+		supervise := oversight.New(
+			oversight.WithSpecification(2, 1*time.Second, oversight.SimpleOneForOne()),
+			oversight.Process(
+				oversight.ChildProcessSpecification{
+					Name:    "first-child",
+					Restart: oversight.Permanent(),
+					Start: func(ctx context.Context) error {
+						t.Log("failed process should always restart...")
+						badSiblingRuns++
+						if badSiblingRuns >= 2 {
+							cancel()
+						}
+						return errors.New("finished")
+					},
+					Shutdown: oversight.Infinity(),
+				},
+				oversight.ChildProcessSpecification{
+					Name:    "second-child",
+					Restart: oversight.Permanent(),
+					Start: func(ctx context.Context) error {
+						t.Log("but sibling must stay untouched")
+						goodSiblingRuns++
+						<-ctx.Done()
+						return nil
+					},
+					Shutdown: oversight.Infinity(),
+				},
+			),
+		)
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			supervise.Start(ctx)
+		}()
+		wg.Wait()
+		if ctx.Err() == context.DeadlineExceeded {
+			t.Error("should never reach deadline exceeded")
+		}
+		if badSiblingRuns < 2 {
+			t.Error("the test did not run long enough", badSiblingRuns)
+		}
+		if goodSiblingRuns != 1 {
+			t.Error("oneForOne should not terminate siblings")
+		}
+	})
 	t.Run("oneForAll", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
