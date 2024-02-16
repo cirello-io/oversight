@@ -129,8 +129,8 @@ func (t *Tree) init() {
 // Add attaches a new child process to a running oversight tree.  This call must
 // be used on running oversight trees. If the tree is halted, it is going to
 // fail with ErrTreeNotRunning. The valid types are ChildProcessSpecification,
-// ChildProcess, and *Tree. If the added child process is invalid, it is going
-// to fail with ErrInvalidChildProcessType.
+// ChildProcess, func(context.Context) and *Tree. If the added child process is
+// invalid, it is going to fail with ErrInvalidChildProcessType.
 func (t *Tree) Add(spec interface{}) error {
 	t.init()
 	if t.err() != nil {
