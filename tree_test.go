@@ -775,6 +775,7 @@ func Test_multipleAdd(t *testing.T) {
 		{"childProcessSpecification", oversight.ChildProcessSpecification{Start: f}, nil},
 		{"abstract childProcess", f, nil},
 		{"concrete childProcess", func(context.Context) error { return nil }, nil},
+		{"concrete errorless childProcess", func(context.Context) {}, nil},
 		{"tree", &oversight.Tree{}, nil},
 		{"invalid", func() {}, oversight.ErrInvalidChildProcessType},
 	}
@@ -1050,5 +1051,22 @@ func TestWaitAfterStart(t *testing.T) {
 	}
 	if count != 0 {
 		t.Fatal("run returned before all children returned")
+	}
+}
+
+func Test_errorLessChild(t *testing.T) {
+	tree := oversight.New(oversight.NeverHalt())
+	var (
+		isDone = make(chan struct{})
+		done   sync.Once
+	)
+	tree.Add(func(ctx context.Context) {
+		done.Do(func() { close(isDone) })
+	})
+	go tree.Start(context.Background())
+	select {
+	case <-isDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("errorless function never called")
 	}
 }

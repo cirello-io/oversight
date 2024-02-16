@@ -149,6 +149,13 @@ func (t *Tree) Add(spec interface{}) error {
 		add = func() { Processes(p)(t) }
 	case func(ctx context.Context) error:
 		add = func() { Processes(p)(t) }
+	case func(ctx context.Context):
+		add = func() {
+			Processes(func(ctx context.Context) error {
+				p(ctx)
+				return nil
+			})(t)
+		}
 	case *Tree:
 		add = func() { WithTree(p)(t) }
 	default:
