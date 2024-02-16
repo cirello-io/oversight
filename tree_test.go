@@ -1077,3 +1077,11 @@ func TestEmptyChildProcessName(t *testing.T) {
 		t.Fatal("unexpected child process name", got)
 	}
 }
+
+func TestEmptyContextTree(t *testing.T) {
+	tree := oversight.New()
+	var nilContext context.Context
+	if err := tree.Start(nilContext); !errors.Is(err, oversight.ErrMissingContext) {
+		t.Fatal("unexpected error", err)
+	}
+}
