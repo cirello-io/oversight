@@ -16,11 +16,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Install go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
       - name: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: test (race detector)
         run: go test -race ./...
       - name: test (verbose)
