@@ -1,9 +1,6 @@
 # cirello.io/oversight/easy
 
-[![GoDoc](https://godoc.org/cirello.io/oversight/easy?status.svg)](https://godoc.org/cirello.io/oversight/easy)
-[![SLA](https://img.shields.io/badge/SLA-95%25-brightgreen.svg)](https://github.com/cirello-io/public/blob/master/SLA.md)
-
-This repository is covered by this [SLA](https://github.com/cirello-io/public/blob/master/SLA.md).
+[![Go Reference](https://pkg.go.dev/badge/cirello.io/oversight/easy.svg)](https://pkg.go.dev/cirello.io/oversight/easy)
 
 Package easy is an easier interface to use cirello.io/oversight. Its lifecycle
 is managed through context.Context. Stop a given oversight tree by cancelling
