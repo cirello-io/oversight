@@ -17,7 +17,7 @@ package oversight
 import (
 	"context"
 	"errors"
-	"io/ioutil"
+	"io"
 	"log"
 	"sync"
 	"time"
@@ -114,7 +114,7 @@ func (t *Tree) init() {
 			DefaultRestartStrategy()(t)
 		}
 		if t.logger == nil {
-			t.logger = log.New(ioutil.Discard, "", 0)
+			t.logger = log.New(io.Discard, "", 0)
 		}
 		t.children = make(map[string]childProcess)
 		t.stopped = make(chan struct{})
@@ -264,17 +264,15 @@ func (t *Tree) Start(rootCtx context.Context) error {
 	defer cancel()
 	t.gracefulCancel = cancel
 	for {
-		select {
-		case <-ctx.Done():
-			return t.drain(ctx)
-		default:
-			t.startChildProcesses(ctx, cancel)
-			t.handleTreeChanges(ctx, cancel)
+		if ctx.Err() != nil {
+			return t.drain()
 		}
+		t.startChildProcesses(ctx, cancel)
+		t.handleTreeChanges(ctx, cancel)
 	}
 }
 
-func (t *Tree) drain(ctx context.Context) error {
+func (t *Tree) drain() error {
 	select {
 	case <-t.stopped:
 		return ErrTreeNotRunning
@@ -282,7 +280,7 @@ func (t *Tree) drain(ctx context.Context) error {
 	}
 	close(t.stopped)
 	defer t.logger.Printf("clean up complete")
-	t.logger.Printf("context canceled (before start): %v", ctx.Err())
+	t.logger.Printf("draining")
 	t.semaphore.Lock()
 	for i := len(t.childrenOrder) - 1; i >= 0; i-- {
 		procName := t.childrenOrder[i]
