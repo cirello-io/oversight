@@ -26,7 +26,7 @@ type restart struct {
 	restarts  []time.Time
 }
 
-func (r *restart) terminate(now time.Time) bool {
+func (r *restart) shouldTerminate(now time.Time) bool {
 	if r.intensity == -1 {
 		return false
 	}

@@ -14,19 +14,20 @@
 
 package oversight
 
+import "slices"
+
 // Strategy defines how the supervisor handles individual failures and tree
 // shutdowns (best effort). The shutdown is initiated in the reverse order of
 // the start of the child processes. The Go scheduler implementation makes it
 // impossible to guarantee any order regarding shutdown completion.
-type Strategy func(t *Tree, failedChildID int)
+type Strategy func(t *Tree, childProcess *childProcess)
 
 // OneForOne ensures that if a child process terminates, only that process is
 // restarted.
 func OneForOne() Strategy {
-	return func(t *Tree, failedChildID int) {
-		proc := t.childrenOrder[failedChildID]
-		proc.state.setFailed()
-		proc.state.stop()
+	return func(t *Tree, childProcess *childProcess) {
+		childProcess.state.setFailed()
+		childProcess.state.stop()
 	}
 }
 
@@ -34,7 +35,7 @@ func OneForOne() Strategy {
 // processes are terminated, and then all child processes, including the
 // terminated one, are restarted.
 func OneForAll() Strategy {
-	return func(t *Tree, failedChildID int) {
+	return func(t *Tree, _ *childProcess) {
 		for i := len(t.childrenOrder) - 1; i >= 0; i-- {
 			proc := t.childrenOrder[i]
 			proc.state.setFailed()
@@ -48,11 +49,14 @@ func OneForAll() Strategy {
 // order) are terminated. Then the terminated child process and the rest of the
 // child processes are restarted.
 func RestForOne() Strategy {
-	return func(t *Tree, failedChildID int) {
-		for i := len(t.childrenOrder) - 1; i >= failedChildID; i-- {
+	return func(t *Tree, childProcess *childProcess) {
+		i := len(t.childrenOrder) - 1
+		failedChildID := slices.Index(t.childrenOrder, childProcess)
+		for i >= failedChildID {
 			proc := t.childrenOrder[i]
 			proc.state.setFailed()
 			proc.state.stop()
+			i--
 		}
 	}
 }
@@ -60,11 +64,10 @@ func RestForOne() Strategy {
 // SimpleOneForOne behaves similarly to OneForOne but it runs the stop calls
 // asynchronously.
 func SimpleOneForOne() Strategy {
-	return func(t *Tree, failedChildID int) {
-		proc := t.childrenOrder[failedChildID]
-		proc.state.setFailed()
+	return func(t *Tree, childProcess *childProcess) {
+		childProcess.state.setFailed()
 		// avoid dereferencing the stop pointer after the t.semaphore is released.
-		stop := proc.state.stop
+		stop := childProcess.state.stop
 		go stop()
 	}
 }

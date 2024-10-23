@@ -27,8 +27,8 @@ func Test_restart_terminate(t *testing.T) {
 		period:    5 * time.Second,
 	}
 	got := []bool{
-		r.terminate(now.Add(1 * time.Second)),
-		r.terminate(now.Add(2 * time.Second)),
+		r.shouldTerminate(now.Add(1 * time.Second)),
+		r.shouldTerminate(now.Add(2 * time.Second)),
 	}
 	expected := []bool{false, true}
 	if !reflect.DeepEqual(got, expected) {

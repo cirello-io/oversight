@@ -334,22 +334,20 @@ func (t *Tree) handleTreeChanges(ctx context.Context, cancel context.CancelFunc)
 		t.logger.Println("detected change in child processes list")
 	case failedChildName := <-t.failure:
 		t.semaphore.Lock()
-		for failedChildID, childProc := range t.childrenOrder {
-			if failedChildName == childProc.spec.Name {
-				t.logger.Printf("child process failure detected (%v)", childProc.spec.Name)
-				t.strategy(t, failedChildID)
-				break
-			}
+		if childProc, ok := t.children[failedChildName]; ok {
+			t.logger.Printf("child process failure detected (%v)", childProc.spec.Name)
+			t.strategy(t, childProc)
 		}
 		t.semaphore.Unlock()
-		if t.restarter.terminate(time.Now()) {
-			t.logger.Printf("too many failures detected:")
-			for _, restart := range t.restarter.restarts {
-				t.logger.Println("-", restart)
-			}
-			t.setErr(ErrTooManyFailures)
-			cancel()
+		if !t.restarter.shouldTerminate(time.Now()) {
+			return
 		}
+		t.logger.Printf("too many failures detected:")
+		for _, restart := range t.restarter.restarts {
+			t.logger.Println("-", restart)
+		}
+		t.setErr(ErrTooManyFailures)
+		cancel()
 	}
 }
 
