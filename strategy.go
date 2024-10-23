@@ -50,8 +50,11 @@ func OneForAll() Strategy {
 // child processes are restarted.
 func RestForOne() Strategy {
 	return func(t *Tree, childProcess *childProcess) {
-		i := len(t.childrenOrder) - 1
 		failedChildID := slices.Index(t.childrenOrder, childProcess)
+		if failedChildID == -1 {
+			return
+		}
+		i := len(t.childrenOrder) - 1
 		for i >= failedChildID {
 			proc := t.childrenOrder[i]
 			proc.state.setFailed()
