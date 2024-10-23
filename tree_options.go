@@ -130,7 +130,7 @@ func Process(specs ...ChildProcessSpecification) TreeOption {
 			if spec.Shutdown == nil {
 				spec.Shutdown = Timeout(DefaultChildProcessTimeout)
 			}
-			t.children[spec.Name] = childProcess{
+			cp := &childProcess{
 				state: &state{
 					stop: func() {
 						t.logger.Println("stopped before start")
@@ -138,7 +138,8 @@ func Process(specs ...ChildProcessSpecification) TreeOption {
 				},
 				spec: &spec,
 			}
-			t.childrenOrder = append(t.childrenOrder, spec.Name)
+			t.children[spec.Name] = cp
+			t.childrenOrder = append(t.childrenOrder, cp)
 		}
 	}
 }

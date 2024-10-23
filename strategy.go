@@ -24,9 +24,9 @@ type Strategy func(t *Tree, failedChildID int)
 // restarted.
 func OneForOne() Strategy {
 	return func(t *Tree, failedChildID int) {
-		procName := t.childrenOrder[failedChildID]
-		t.children[procName].state.setFailed()
-		t.children[procName].state.stop()
+		proc := t.childrenOrder[failedChildID]
+		proc.state.setFailed()
+		proc.state.stop()
 	}
 }
 
@@ -36,9 +36,9 @@ func OneForOne() Strategy {
 func OneForAll() Strategy {
 	return func(t *Tree, failedChildID int) {
 		for i := len(t.childrenOrder) - 1; i >= 0; i-- {
-			procName := t.childrenOrder[i]
-			t.children[procName].state.setFailed()
-			t.children[procName].state.stop()
+			proc := t.childrenOrder[i]
+			proc.state.setFailed()
+			proc.state.stop()
 		}
 	}
 }
@@ -50,9 +50,9 @@ func OneForAll() Strategy {
 func RestForOne() Strategy {
 	return func(t *Tree, failedChildID int) {
 		for i := len(t.childrenOrder) - 1; i >= failedChildID; i-- {
-			procName := t.childrenOrder[i]
-			t.children[procName].state.setFailed()
-			t.children[procName].state.stop()
+			proc := t.childrenOrder[i]
+			proc.state.setFailed()
+			proc.state.stop()
 		}
 	}
 }
@@ -61,10 +61,10 @@ func RestForOne() Strategy {
 // asynchronously.
 func SimpleOneForOne() Strategy {
 	return func(t *Tree, failedChildID int) {
-		procName := t.childrenOrder[failedChildID]
-		t.children[procName].state.setFailed()
+		proc := t.childrenOrder[failedChildID]
+		proc.state.setFailed()
 		// avoid dereferencing the stop pointer after the t.semaphore is released.
-		stop := t.children[procName].state.stop
+		stop := proc.state.stop
 		go stop()
 	}
 }
