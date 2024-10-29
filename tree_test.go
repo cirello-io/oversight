@@ -1148,3 +1148,36 @@ func TestTerminateNoExistingChildProcess(t *testing.T) {
 		t.Fatal("unexpected error", err)
 	}
 }
+
+func Test_deleteFinishedTransient(t *testing.T) {
+	tree := oversight.New(
+		oversight.NeverHalt(),
+	)
+	ready := make(chan struct{})
+	tree.Add(oversight.ChildProcessSpecification{
+		Restart: oversight.Permanent(),
+		Start: func(ctx context.Context) error {
+			<-ctx.Done()
+			return nil
+		},
+	})
+	tree.Add(oversight.ChildProcessSpecification{
+		Name:    "failed-transient",
+		Restart: oversight.Transient(),
+		Start: func(context.Context) error {
+			t.Log("running transient process")
+			defer close(ready)
+			return nil
+		},
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	t.Cleanup(cancel)
+	go tree.Start(ctx)
+	<-ready
+	time.Sleep(1 * time.Second)
+	err := tree.Delete("failed-transient")
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-ctx.Done()
+}

@@ -463,7 +463,7 @@ func (t *Tree) Terminate(name string) error {
 // trees, if the tree is not started yet, it is going to block. If the tree is
 // halted, it is going to fail with ErrTreeNotRunning.
 func (t *Tree) Delete(name string) error {
-	if err := t.Terminate(name); err != nil {
+	if err := t.Terminate(name); err != nil && !errors.Is(err, ErrProcessNotRunning) {
 		return err
 	}
 	t.semaphore.Lock()
@@ -471,6 +471,7 @@ func (t *Tree) Delete(name string) error {
 	t.childrenOrder = slices.DeleteFunc(t.childrenOrder, func(cp *childProcess) bool {
 		return cp.spec.Name == name
 	})
+	delete(t.children, name)
 	return nil
 }
 
