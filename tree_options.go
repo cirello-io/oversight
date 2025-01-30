@@ -168,3 +168,11 @@ func WithTree(subTree *Tree) TreeOption {
 		})(t)
 	}
 }
+
+// AutomaticPrune removes processes as soon as they are either done or
+// terminally failed.
+func AutomaticPrune() TreeOption {
+	return func(t *Tree) {
+		t.automaticPrune = true
+	}
+}

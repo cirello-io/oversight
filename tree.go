@@ -61,6 +61,13 @@ type childProcess struct {
 	state *state
 }
 
+func (cp *childProcess) shouldPrune() bool {
+	cp.state.mu.Lock()
+	defer cp.state.mu.Unlock()
+	return cp.state.state == Done ||
+		(cp.state.state == Failed && !cp.spec.Restart(cp.state.err))
+}
+
 // Tree is the supervisor tree proper.
 type Tree struct {
 	initializeOnce sync.Once
@@ -87,6 +94,8 @@ type Tree struct {
 	anyStartedProcessEver bool
 	restarter             *restart
 	gracefulCancel        context.CancelFunc
+
+	automaticPrune bool
 }
 
 // New creates a new oversight (supervisor) tree with the applied options.
@@ -336,6 +345,9 @@ func (t *Tree) handleTreeChanges(ctx context.Context, cancel context.CancelFunc)
 		t.semaphore.Lock()
 		if childProc, ok := t.children[failedChildName]; ok {
 			t.logger.Printf("child process failure detected (%v)", childProc.spec.Name)
+			if t.automaticPrune && childProc.shouldPrune() {
+				t.deleteChildByName(childProc.spec.Name)
+			}
 			t.strategy(t, childProc)
 		}
 		t.semaphore.Unlock()
@@ -468,11 +480,15 @@ func (t *Tree) Delete(name string) error {
 	}
 	t.semaphore.Lock()
 	defer t.semaphore.Unlock()
+	t.deleteChildByName(name)
+	return nil
+}
+
+func (t *Tree) deleteChildByName(name string) {
 	t.childrenOrder = slices.DeleteFunc(t.childrenOrder, func(cp *childProcess) bool {
 		return cp.spec.Name == name
 	})
 	delete(t.children, name)
-	return nil
 }
 
 // Children returns the current set of child processes.

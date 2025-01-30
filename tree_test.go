@@ -1152,12 +1152,15 @@ func TestTerminateNoExistingChildProcess(t *testing.T) {
 func Test_deleteFinishedTransient(t *testing.T) {
 	tree := oversight.New(
 		oversight.NeverHalt(),
+		oversight.WithRestartStrategy(oversight.OneForAll()),
 	)
 	ready := make(chan struct{})
+	cycled := make(chan struct{}, 1)
 	tree.Add(oversight.ChildProcessSpecification{
 		Restart: oversight.Permanent(),
 		Start: func(ctx context.Context) error {
 			<-ctx.Done()
+			cycled <- struct{}{}
 			return nil
 		},
 	})
@@ -1174,7 +1177,7 @@ func Test_deleteFinishedTransient(t *testing.T) {
 	t.Cleanup(cancel)
 	go tree.Start(ctx)
 	<-ready
-	time.Sleep(1 * time.Second)
+	<-cycled
 	err := tree.Delete("failed-transient")
 	if err != nil {
 		t.Fatal(err)
