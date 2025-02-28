@@ -18,8 +18,6 @@ import (
 	"time"
 )
 
-var timeNow = time.Now
-
 type restart struct {
 	intensity int
 	period    time.Duration
