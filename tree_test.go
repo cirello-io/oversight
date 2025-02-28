@@ -1,4 +1,4 @@
-// Copyright 2018 cirello.io/oversight - Ulderico Cirello
+// Copyright 2018 cirello.io/oversight/v2 - Ulderico Cirello
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"cirello.io/oversight"
+	oversight "cirello.io/oversight/v2"
 )
 
 // ExampleTree_singlePermanent shows how to create a static tree of permanent

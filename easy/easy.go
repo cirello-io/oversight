@@ -1,4 +1,4 @@
-// Copyright 2018 cirello.io/oversight - Ulderico Cirello
+// Copyright 2018 cirello.io/oversight/v2 - Ulderico Cirello
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,14 +13,13 @@
 // limitations under the License.
 
 /*
-Package easy is an easier interface to use cirello.io/oversight. Its lifecycle
+Package easy is an easier interface to use cirello.io/oversight/v2. Its lifecycle
 is managed through context.Context. Stop a given oversight tree by cancelling
 its context.
 
-
 	package main
 
-	import oversight "cirello.io/oversight/easy"
+	import oversight "cirello.io/oversight/v2/easy"
 
 	func main() {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -34,7 +33,7 @@ its context.
 
 This package is covered by this SLA: https://cirello.io/sla
 */
-package easy // import "cirello.io/oversight/easy"
+package easy // import "cirello.io/oversight/v2/easy"
 
 import (
 	"context"
@@ -43,7 +42,7 @@ import (
 	"math/rand"
 	"sync"
 
-	"cirello.io/oversight"
+	"cirello.io/oversight/v2"
 )
 
 type ctxKey int

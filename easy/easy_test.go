@@ -1,4 +1,4 @@
-// Copyright 2018 cirello.io/oversight - Ulderico Cirello
+// Copyright 2018 cirello.io/oversight/v2 - Ulderico Cirello
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import (
 	"context"
 	"testing"
 
-	oversight "cirello.io/oversight/easy"
+	oversight "cirello.io/oversight/v2/easy"
 )
 
 func TestInvalidContext(t *testing.T) {

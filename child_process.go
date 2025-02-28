@@ -1,4 +1,4 @@
-// Copyright 2018 cirello.io/oversight - Ulderico Cirello
+// Copyright 2018 cirello.io/oversight/v2 - Ulderico Cirello
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,15 +26,16 @@ type ChildProcessState string
 // Child processes navigate through a sequence of states, that are atomically
 // managed by the oversight tree to decide if child process needs to be started
 // or not.
-//                             ┌─────────────────────┐
-//                             │                     │
-//                             │              ┌────────────┐
-//                             ▼         ┌───▶│   Failed   │
-//    ┌────────────┐    ┌────────────┐   │    └────────────┘
-//    │  Starting  │───▶│  Running   │───┤
-//    └────────────┘    └────────────┘   │    ┌────────────┐
-//                                       └───▶│    Done    │
-//                                            └────────────┘
+//
+//	                         ┌─────────────────────┐
+//	                         │                     │
+//	                         │              ┌────────────┐
+//	                         ▼         ┌───▶│   Failed   │
+//	┌────────────┐    ┌────────────┐   │    └────────────┘
+//	│  Starting  │───▶│  Running   │───┤
+//	└────────────┘    └────────────┘   │    ┌────────────┐
+//	                                   └───▶│    Done    │
+//	                                        └────────────┘
 const (
 	Starting ChildProcessState = ""
 	Running  ChildProcessState = "running"

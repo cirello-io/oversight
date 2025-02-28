@@ -1,4 +1,4 @@
-// Copyright 2018 cirello.io/oversight - Ulderico Cirello
+// Copyright 2018 cirello.io/oversight/v2 - Ulderico Cirello
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,44 +17,42 @@
 //
 // Refer to: http://erlang.org/doc/design_principles/sup_princ.html
 //
-//     supervisor := oversight.New(
-//     	oversight.WithRestartStrategy(oversight.OneForOne()),
-//     	oversight.Processes(func(ctx context.Context) error {
-//     		select {
-//     		case <-ctx.Done():
-//     			return nil
-//     		case <-time.After(time.Second):
-//     			log.Println(1)
-//     		}
-//     		return nil
-//     	}),
-//     )
-//     ctx, cancel := context.WithCancel(context.Background())
-//     defer cancel()
-//     if err := supervisor.Start(ctx); err != nil {
-//     	log.Fatal(err)
-//     }
+//	supervisor := oversight.New(
+//		oversight.WithRestartStrategy(oversight.OneForOne()),
+//		oversight.Processes(func(ctx context.Context) error {
+//			select {
+//			case <-ctx.Done():
+//				return nil
+//			case <-time.After(time.Second):
+//				log.Println(1)
+//			}
+//			return nil
+//		}),
+//	)
+//	ctx, cancel := context.WithCancel(context.Background())
+//	defer cancel()
+//	if err := supervisor.Start(ctx); err != nil {
+//		log.Fatal(err)
+//	}
 //
-// Simple interface
+// # Simple interface
 //
 // If you do not need to use nested trees, you might prefer using
-// cirello.io/oversight/easy instead. It provides a OneForAll tree with the
+// cirello.io/oversight/v2/easy instead. It provides a OneForAll tree with the
 // automatic halting disabled.
 //
-// 	package main
+//	package main
 //
-// 	import oversight "cirello.io/oversight/easy"
+//	import oversight "cirello.io/oversight/v2/easy"
 //
-// 	func main() {
-// 		ctx, cancel := context.WithCancel(context.Background())
-// 		defer cancel() // use cancel() to halt the tree.
-// 		ctx = oversight.WithContext(ctx)
-// 		oversight.Add(ctx, func(ctx context.Context) {
-// 			// ...
-// 		})
-// 	}
-//
-// This package is covered by this SLA: https://cirello.io/sla
+//	func main() {
+//		ctx, cancel := context.WithCancel(context.Background())
+//		defer cancel() // use cancel() to halt the tree.
+//		ctx = oversight.WithContext(ctx)
+//		oversight.Add(ctx, func(ctx context.Context) {
+//			// ...
+//		})
+//	}
 //
 // Security Notice: there has been permanent attempts to use the name of this package to spread malware. Please refer to https://github.com/cirello-io/oversight/issues/3 for more information.
-package oversight // import "cirello.io/oversight"
+package oversight // import "cirello.io/oversight/v2"

@@ -1,15 +1,15 @@
-# cirello.io/oversight
+# cirello.io/oversight/v2
 
-[![Go Reference](https://pkg.go.dev/badge/cirello.io/oversight.svg)](https://pkg.go.dev/cirello.io/oversight)
+[![Go Reference](https://pkg.go.dev/badge/cirello.io/oversight/v2.svg)](https://pkg.go.dev/cirello.io/oversight/v2)
 
 Package oversight makes a complete implementation of the Erlang supervision
 trees.
 
 Refer to: http://erlang.org/doc/design_principles/sup_princ.html
 
-go get [-u -f] cirello.io/oversight
+go get cirello.io/oversight/v2
 
-https://godoc.org/cirello.io/oversight
+https://godoc.org/cirello.io/oversight/v2
 
 
 ## Quickstart
