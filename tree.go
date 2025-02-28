@@ -17,8 +17,10 @@ package oversight
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"slices"
 	"sync"
 	"time"
@@ -45,11 +47,6 @@ var ErrProcessNotRunning = errors.New("process not running")
 // time is not running anymore.
 var ErrTreeNotRunning = errors.New("oversight tree is not running")
 
-// ErrInvalidChildProcessType is returned when caller tries to add an invalid
-// child process to the oversight tree. The child process type must always be
-// ChildProcessSpecification, ChildProcess, and *Tree.
-var ErrInvalidChildProcessType = errors.New("invalid child process type")
-
 // ErrInvalidConfiguration is returned when tree has invalid settings.
 var ErrInvalidConfiguration = errors.New("invalid tree configuration")
 
@@ -59,13 +56,6 @@ var ErrMissingContext = errors.New("missing context")
 type childProcess struct {
 	spec  *ChildProcessSpecification
 	state *state
-}
-
-func (cp *childProcess) shouldPrune() bool {
-	cp.state.mu.Lock()
-	defer cp.state.mu.Unlock()
-	return cp.state.state == Done ||
-		(cp.state.state == Failed && !cp.spec.Restart(cp.state.err))
 }
 
 // Tree is the supervisor tree proper.
@@ -94,8 +84,6 @@ type Tree struct {
 	anyStartedProcessEver bool
 	restarter             *restart
 	gracefulCancel        context.CancelFunc
-
-	automaticPrune bool
 }
 
 // New creates a new oversight (supervisor) tree with the applied options.
@@ -139,10 +127,8 @@ func (t *Tree) init() {
 
 // Add attaches a new child process to a running oversight tree.  This call must
 // be used on running oversight trees. If the tree is halted, it is going to
-// fail with ErrTreeNotRunning. The valid types are ChildProcessSpecification,
-// ChildProcess, func(context.Context) and *Tree. If the added child process is
-// invalid, it is going to fail with ErrInvalidChildProcessType.
-func (t *Tree) Add(spec any) error {
+// fail with ErrTreeNotRunning.
+func (t *Tree) Add(spec ChildProcessSpecification) error {
 	t.init()
 	if t.err() != nil {
 		return ErrTreeNotRunning
@@ -152,28 +138,8 @@ func (t *Tree) Add(spec any) error {
 		return ErrTreeNotRunning
 	default:
 	}
-	var add func()
-	switch p := spec.(type) {
-	case ChildProcessSpecification:
-		add = func() { Process(p)(t) }
-	case ChildProcess:
-		add = func() { Processes(p)(t) }
-	case func(ctx context.Context) error:
-		add = func() { Processes(p)(t) }
-	case func(ctx context.Context):
-		add = func() {
-			Processes(func(ctx context.Context) error {
-				p(ctx)
-				return nil
-			})(t)
-		}
-	case *Tree:
-		add = func() { WithTree(p)(t) }
-	default:
-		return ErrInvalidChildProcessType
-	}
 	t.semaphore.Lock()
-	add()
+	t.addChildProcessSpecification(spec)
 	t.semaphore.Unlock()
 	go func() { t.processChanged <- struct{}{} }()
 	return nil
@@ -345,9 +311,6 @@ func (t *Tree) handleTreeChanges(ctx context.Context, cancel context.CancelFunc)
 		t.semaphore.Lock()
 		if childProc, ok := t.children[failedChildName]; ok {
 			t.logger.Printf("child process failure detected (%v)", childProc.spec.Name)
-			if t.automaticPrune && childProc.shouldPrune() {
-				t.deleteChildByName(childProc.spec.Name)
-			}
 			t.strategy(t, childProc)
 		}
 		t.semaphore.Unlock()
@@ -554,10 +517,6 @@ func (t *Tree) GracefulShutdown(ctx context.Context) error {
 	}
 }
 
-func (t *Tree) GetErr() error {
-	return t.err()
-}
-
 func (t *Tree) err() error {
 	t.errorMu.Lock()
 	err := t.error
@@ -569,4 +528,34 @@ func (t *Tree) setErr(err error) {
 	t.errorMu.Lock()
 	t.error = err
 	t.errorMu.Unlock()
+}
+
+func (t *Tree) addChildProcessSpecification(spec ChildProcessSpecification) {
+	t.init()
+	if spec.Start == nil {
+		panic("child process must always have a function")
+	}
+	id := rand.Int63()
+	if spec.Name == "" {
+		spec.Name = fmt.Sprintf("childproc %d", id)
+	}
+	if _, ok := t.children[spec.Name]; ok {
+		spec.Name += fmt.Sprint(" ", id)
+	}
+	if spec.Restart == nil {
+		spec.Restart = Permanent()
+	}
+	if spec.Shutdown == nil {
+		spec.Shutdown = Timeout(DefaultChildProcessTimeout)
+	}
+	cp := &childProcess{
+		state: &state{
+			stop: func() {
+				t.logger.Println("stopped before start")
+			},
+		},
+		spec: &spec,
+	}
+	t.children[spec.Name] = cp
+	t.childrenOrder = append(t.childrenOrder, cp)
 }

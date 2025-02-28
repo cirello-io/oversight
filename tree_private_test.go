@@ -16,17 +16,18 @@ package oversight
 
 import (
 	"context"
-	"errors"
-	"slices"
 	"testing"
-	"time"
 )
 
 func Test_uniqueName(t *testing.T) {
-	tree := New(
-		Process(ChildProcessSpecification{Name: "alpha", Start: func(ctx context.Context) error { return nil }}),
-		Process(ChildProcessSpecification{Name: "alpha", Start: func(ctx context.Context) error { return nil }}),
-	)
+	var tree Tree
+	if err := tree.Add(ChildProcessSpecification{Name: "alpha", Start: func(ctx context.Context) error { return nil }}); err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+	if err := tree.Add(ChildProcessSpecification{Name: "alpha", Start: func(ctx context.Context) error { return nil }}); err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
 	seenNames := make(map[string]struct{})
 	for _, p := range tree.children {
 		if _, ok := seenNames[p.spec.Name]; ok {
@@ -43,156 +44,10 @@ func Test_invalidChildProcessSpecification(t *testing.T) {
 				foundPanic = true
 			}
 		}()
-		New(Process(ChildProcessSpecification{}))
+		var tree Tree
+		tree.Add(ChildProcessSpecification{})
 	}()
 	if !foundPanic {
 		t.Error("invalid child process specification should trigger have triggered a panic")
 	}
-}
-
-func Test_automaticPruning(t *testing.T) {
-	t.Run("permanent", func(t *testing.T) {
-		tree := New(
-			NeverHalt(),
-			AutomaticPrune(),
-		)
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		t.Cleanup(cancel)
-		go tree.Start(ctx)
-		tick := make(chan struct{})
-		tree.Add(ChildProcessSpecification{
-			Name:    "permanent-always-fail",
-			Restart: Permanent(),
-			Start: func(ctx context.Context) error {
-				<-tick
-				return errors.New("always error")
-			},
-		})
-		tick <- struct{}{}
-		if len(tree.Children()) != 1 {
-			t.Fatal("permanent processes must not be ever pruned")
-		}
-		tick <- struct{}{}
-		if len(tree.Children()) != 1 {
-			t.Fatal("permanent processes must not be ever pruned")
-		}
-	})
-	t.Run("temporary/success", func(t *testing.T) {
-		tree := New(
-			NeverHalt(),
-			AutomaticPrune(),
-			WithRestartStrategy(OneForAll()),
-		)
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		t.Cleanup(cancel)
-		go tree.Start(ctx)
-		cycled := make(chan struct{}, 1)
-		tree.Add(ChildProcessSpecification{
-			Name:    "permanent-ignore",
-			Restart: Permanent(),
-			Start: func(ctx context.Context) error {
-				<-ctx.Done()
-				cycled <- struct{}{}
-				return nil
-			},
-			Shutdown: Infinity(),
-		})
-		tree.Add(ChildProcessSpecification{
-			Name:    "temporary",
-			Restart: Temporary(),
-			Start: func(ctx context.Context) error {
-				return nil
-			},
-			Shutdown: Infinity(),
-		})
-		<-cycled
-		children := tree.Children()
-		idx := slices.IndexFunc(children, func(p State) bool { return p.Name == "temporary" })
-		if idx != -1 {
-			t.Fatalf("success temporary processes must always be pruned: %#v", children[idx])
-		}
-	})
-	t.Run("temporary/failure", func(t *testing.T) {
-		tree := New(
-			NeverHalt(),
-			AutomaticPrune(),
-			WithRestartStrategy(OneForAll()),
-		)
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		t.Cleanup(cancel)
-		go tree.Start(ctx)
-		cycled := make(chan struct{}, 1)
-		tree.Add(ChildProcessSpecification{
-			Name:    "permanent-ignore",
-			Restart: Permanent(),
-			Start: func(ctx context.Context) error {
-				<-ctx.Done()
-				cycled <- struct{}{}
-				return nil
-			},
-			Shutdown: Infinity(),
-		})
-		tree.Add(ChildProcessSpecification{
-			Name:    "temporary",
-			Restart: Temporary(),
-			Start: func(ctx context.Context) error {
-				return errors.New("error")
-			},
-			Shutdown: Infinity(),
-		})
-		<-cycled
-		children := tree.Children()
-		idx := slices.IndexFunc(children, func(p State) bool { return p.Name == "temporary" })
-		if idx != -1 {
-			t.Fatalf("failed temporary processes must always be pruned: %#v", children[idx])
-		}
-	})
-	t.Run("transient", func(t *testing.T) {
-		tree := New(
-			NeverHalt(),
-			AutomaticPrune(),
-			WithRestartStrategy(OneForAll()),
-		)
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		t.Cleanup(cancel)
-		go tree.Start(ctx)
-		cycled := make(chan struct{}, 1)
-		tree.Add(ChildProcessSpecification{
-			Name:    "permanent-ignore",
-			Restart: Permanent(),
-			Start: func(ctx context.Context) error {
-				<-ctx.Done()
-				cycled <- struct{}{}
-				return nil
-			},
-			Shutdown: Infinity(),
-		})
-		errs := make(chan error)
-		tree.Add(ChildProcessSpecification{
-			Name:    "transient",
-			Restart: Transient(),
-			Start: func(ctx context.Context) error {
-				return <-errs
-			},
-			Shutdown: Infinity(),
-		})
-		{
-			errs <- errors.New("error")
-			<-cycled
-			children := tree.Children()
-			idx := slices.IndexFunc(children, func(p State) bool { return p.Name == "transient" })
-			if idx == -1 {
-				t.Fatal("failed transient processes must not be pruned")
-			}
-		}
-		{
-			errs <- nil
-			<-cycled
-			children := tree.Children()
-			idx := slices.IndexFunc(children, func(p State) bool { return p.Name == "transient" })
-			if idx != -1 {
-				t.Fatal("successful transient processes must be pruned", children[idx])
-			}
-		}
-	})
 }

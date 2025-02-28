@@ -15,8 +15,6 @@
 package oversight
 
 import (
-	"fmt"
-	"math/rand"
 	"time"
 )
 
@@ -40,12 +38,6 @@ func WithMaximumRestartIntensity(maxR int, maxT time.Duration) TreeOption {
 	return func(t *Tree) {
 		t.maxR, t.maxT = maxR, maxT
 	}
-}
-
-// WithRestartIntensity is an alias for WithMaximumRestartIntensity.
-// Deprecated in favor of WithMaximumRestartIntensity.
-func WithRestartIntensity(maxR int, maxT time.Duration) TreeOption {
-	return WithMaximumRestartIntensity(maxR, maxT)
 }
 
 // NeverHalt will configure the oversight tree to never stop in face of failure.
@@ -72,13 +64,6 @@ func DefaultMaximumRestartIntensity() TreeOption {
 	}
 }
 
-// DefaultRestartIntensity is an alias for DefaultMaximumRestartIntensity.
-//
-// Deprecated in favor of DefaultMaximumRestartIntensity.
-func DefaultRestartIntensity() TreeOption {
-	return DefaultMaximumRestartIntensity()
-}
-
 // WithRestartStrategy defines a custom restart strategy for the supervisor
 // tree.
 func WithRestartStrategy(strategy Strategy) TreeOption {
@@ -94,56 +79,6 @@ func DefaultRestartStrategy() TreeOption {
 	}
 }
 
-// Processes plugs one or more Permanent child processes to the supervisor tree.
-// Processes never reset the child process list.
-func Processes(processes ...ChildProcess) TreeOption {
-	return func(t *Tree) {
-		for _, p := range processes {
-			Process(ChildProcessSpecification{
-				Restart: Permanent(),
-				Start:   p,
-			})(t)
-		}
-	}
-}
-
-// Process plugs one or more child processes to the supervisor tree. Process
-// never reset the child process list.
-func Process(specs ...ChildProcessSpecification) TreeOption {
-	return func(t *Tree) {
-		t.init()
-		for _, spec := range specs {
-			spec := spec
-			if spec.Start == nil {
-				panic("child process must always have a function")
-			}
-			id := rand.Int63()
-			if spec.Name == "" {
-				spec.Name = fmt.Sprintf("childproc %d", id)
-			}
-			if _, ok := t.children[spec.Name]; ok {
-				spec.Name += fmt.Sprint(" ", id)
-			}
-			if spec.Restart == nil {
-				spec.Restart = Permanent()
-			}
-			if spec.Shutdown == nil {
-				spec.Shutdown = Timeout(DefaultChildProcessTimeout)
-			}
-			cp := &childProcess{
-				state: &state{
-					stop: func() {
-						t.logger.Println("stopped before start")
-					},
-				},
-				spec: &spec,
-			}
-			t.children[spec.Name] = cp
-			t.childrenOrder = append(t.childrenOrder, cp)
-		}
-	}
-}
-
 // Logger defines the interface for any logging facility to be compatible with
 // oversight trees.
 type Logger interface {
@@ -156,24 +91,5 @@ type Logger interface {
 func WithLogger(logger Logger) TreeOption {
 	return func(t *Tree) {
 		t.logger = logger
-	}
-}
-
-// WithTree is a shortcut to add a tree as a child process.
-func WithTree(subTree *Tree) TreeOption {
-	return func(t *Tree) {
-		Process(ChildProcessSpecification{
-			Restart:  Permanent(),
-			Start:    subTree.Start,
-			Shutdown: Infinity(),
-		})(t)
-	}
-}
-
-// AutomaticPrune removes processes as soon as they are either done or
-// terminally failed.
-func AutomaticPrune() TreeOption {
-	return func(t *Tree) {
-		t.automaticPrune = true
 	}
 }
