@@ -1,3 +1,3 @@
 module cirello.io/oversight
 
-go 1.23
+go 1.24

@@ -142,7 +142,7 @@ func (t *Tree) init() {
 // fail with ErrTreeNotRunning. The valid types are ChildProcessSpecification,
 // ChildProcess, func(context.Context) and *Tree. If the added child process is
 // invalid, it is going to fail with ErrInvalidChildProcessType.
-func (t *Tree) Add(spec interface{}) error {
+func (t *Tree) Add(spec any) error {
 	t.init()
 	if t.err() != nil {
 		return ErrTreeNotRunning

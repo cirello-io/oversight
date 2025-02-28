@@ -147,8 +147,8 @@ func Process(specs ...ChildProcessSpecification) TreeOption {
 // Logger defines the interface for any logging facility to be compatible with
 // oversight trees.
 type Logger interface {
-	Printf(format string, args ...interface{})
-	Println(args ...interface{})
+	Printf(format string, args ...any)
+	Println(args ...any)
 }
 
 // WithLogger plugs a custom logger to the oversight tree.

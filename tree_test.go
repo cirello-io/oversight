@@ -442,8 +442,7 @@ func Test_nestedTree(t *testing.T) {
 			},
 		),
 	)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	root.Start(ctx)
 	leafMu.Lock()
 	lc := leafCount
@@ -461,8 +460,7 @@ func Test_nestedTree(t *testing.T) {
 func Test_dynamicChild(t *testing.T) {
 	t.Parallel()
 	tempExecCount := 0
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	var o oversight.Tree
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -513,8 +511,7 @@ func Test_customLogger(t *testing.T) {
 
 func Test_childProcTimeout(t *testing.T) {
 	t.Parallel()
-	blockedCtx, blockedCancel := context.WithCancel(context.Background())
-	defer blockedCancel()
+	blockedCtx := t.Context()
 	started := make(chan struct{})
 	supervise := oversight.New(
 		oversight.Process(oversight.ChildProcessSpecification{
@@ -586,8 +583,7 @@ func Test_terminateChildProc(t *testing.T) {
 				},
 			),
 		)
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		var expectedError error
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -641,8 +637,7 @@ func Test_terminateChildProc(t *testing.T) {
 				},
 			),
 		)
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := t.Context()
 		var wg sync.WaitGroup
 		wg.Add(1)
 		go func() {
@@ -820,7 +815,7 @@ func Test_multipleAdd(t *testing.T) {
 	var f oversight.ChildProcess = func(context.Context) error { return nil }
 	children := []struct {
 		name          string
-		f             interface{}
+		f             any
 		expectedError error
 	}{
 		{"childProcessSpecification", oversight.ChildProcessSpecification{Start: f}, nil},
@@ -932,7 +927,7 @@ func TestTree_shutdownOrder(t *testing.T) {
 			return nil
 		}
 		tree := oversight.New()
-		for i := 0; i < 4; i++ {
+		for i := range 4 {
 			wg.Add(1)
 			tree.Add(oversight.ChildProcessSpecification{
 				Name:    fmt.Sprint("child-", i),
@@ -990,7 +985,7 @@ func TestTree_shutdownOrder(t *testing.T) {
 			return nil
 		}
 		tree := oversight.New()
-		for i := 0; i < 4; i++ {
+		for i := range 4 {
 			wg.Add(1)
 			tree.Add(oversight.ChildProcessSpecification{
 				Name:    fmt.Sprint("child-", i),
@@ -1081,7 +1076,7 @@ func TestWaitAfterStart(t *testing.T) {
 		count int
 	)
 	ctx, cancel := context.WithCancel(context.Background())
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		mu.Lock()
 		count++
 		mu.Unlock()
@@ -1106,8 +1101,7 @@ func TestWaitAfterStart(t *testing.T) {
 }
 
 func Test_errorLessChild(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	tree := oversight.New(oversight.NeverHalt())
 	var (
 		isDone = make(chan struct{})
@@ -1140,8 +1134,7 @@ func TestEmptyContextTree(t *testing.T) {
 }
 
 func TestTerminateNoExistingChildProcess(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	tree := oversight.New(oversight.NeverHalt())
 	go tree.Start(ctx)
 	if err := tree.Terminate("404"); !errors.Is(err, oversight.ErrUnknownProcess) {
