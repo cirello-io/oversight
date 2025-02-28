@@ -55,4 +55,6 @@
 // 	}
 //
 // This package is covered by this SLA: https://cirello.io/sla
+//
+// Security Notice: there has been permanent attempts to use the name of this package to spread malware. Please refer to https://github.com/cirello-io/oversight/issues/3 for more information.
 package oversight // import "cirello.io/oversight"
