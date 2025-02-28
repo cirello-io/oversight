@@ -151,7 +151,8 @@ type Logger interface {
 	Println(args ...any)
 }
 
-// WithLogger plugs a custom logger to the oversight tree.
+// WithLogger plugs a custom logger to the oversight tree. It assumes the logger
+// is thread-safe.
 func WithLogger(logger Logger) TreeOption {
 	return func(t *Tree) {
 		t.logger = logger
