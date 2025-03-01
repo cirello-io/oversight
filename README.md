@@ -2,8 +2,7 @@
 
 [![Go Reference](https://pkg.go.dev/badge/cirello.io/oversight/v2.svg)](https://pkg.go.dev/cirello.io/oversight/v2)
 
-Package oversight makes a complete implementation of the Erlang supervision
-trees.
+Package oversight mimics the implementation of Erlang supervision trees.
 
 Refer to: http://erlang.org/doc/design_principles/sup_princ.html
 

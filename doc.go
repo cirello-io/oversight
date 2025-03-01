@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package oversight makes a complete implementation of the Erlang supervision
-// trees.
+// Package oversight mimics the implementation of Erlang supervision trees.
 //
 // Refer to: http://erlang.org/doc/design_principles/sup_princ.html
 //
