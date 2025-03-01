@@ -53,6 +53,10 @@ var ErrInvalidConfiguration = errors.New("invalid tree configuration")
 // ErrMissingContext is returned when a nil value is passed as context
 var ErrMissingContext = errors.New("missing context")
 
+// ErrChildProcessSpecificationMissingStart is returned when a child process
+// specification is missing the start function.
+var ErrChildProcessSpecificationMissingStart = errors.New("missing start function in child process specification")
+
 type childProcess struct {
 	spec  *ChildProcessSpecification
 	state *state
@@ -139,10 +143,10 @@ func (t *Tree) Add(spec ChildProcessSpecification) error {
 	default:
 	}
 	t.semaphore.Lock()
-	t.addChildProcessSpecification(spec)
+	err := t.addChildProcessSpecification(spec)
 	t.semaphore.Unlock()
 	go func() { t.processChanged <- struct{}{} }()
-	return nil
+	return err
 }
 
 // Start ignites the supervisor tree.
@@ -530,10 +534,9 @@ func (t *Tree) setErr(err error) {
 	t.errorMu.Unlock()
 }
 
-func (t *Tree) addChildProcessSpecification(spec ChildProcessSpecification) {
-	t.init()
+func (t *Tree) addChildProcessSpecification(spec ChildProcessSpecification) error {
 	if spec.Start == nil {
-		panic("child process must always have a function")
+		return ErrChildProcessSpecificationMissingStart
 	}
 	id := rand.Int63()
 	if spec.Name == "" {
@@ -558,4 +561,5 @@ func (t *Tree) addChildProcessSpecification(spec ChildProcessSpecification) {
 	}
 	t.children[spec.Name] = cp
 	t.childrenOrder = append(t.childrenOrder, cp)
+	return nil
 }

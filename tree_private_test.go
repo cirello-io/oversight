@@ -16,6 +16,7 @@ package oversight
 
 import (
 	"context"
+	"errors"
 	"testing"
 )
 
@@ -37,17 +38,9 @@ func Test_uniqueName(t *testing.T) {
 }
 
 func Test_invalidChildProcessSpecification(t *testing.T) {
-	var foundPanic bool
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				foundPanic = true
-			}
-		}()
-		var tree Tree
-		tree.Add(ChildProcessSpecification{})
-	}()
-	if !foundPanic {
+	var tree Tree
+	err := tree.Add(ChildProcessSpecification{})
+	if !errors.Is(err, ErrChildProcessSpecificationMissingStart) {
 		t.Error("invalid child process specification should trigger have triggered a panic")
 	}
 }
