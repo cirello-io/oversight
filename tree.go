@@ -482,11 +482,12 @@ func (t *Tree) addChildProcessSpecification(spec ChildProcessSpecification) erro
 	if spec.Start == nil {
 		return ErrChildProcessSpecificationMissingStart
 	}
-	id := rand.Int63()
 	if spec.Name == "" {
+		id := rand.Int63()
 		spec.Name = fmt.Sprintf("childproc %d", id)
 	}
 	if _, ok := t.children[spec.Name]; ok {
+		id := rand.Int63()
 		spec.Name += fmt.Sprint(" ", id)
 	}
 	if spec.Restart == nil {
