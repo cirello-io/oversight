@@ -355,12 +355,9 @@ func (t *Tree) startChildProcess(ctx context.Context, p *ChildProcessSpecificati
 	}()
 }
 
-type oversightValue string
-
 func (t *Tree) plugStop(ctx context.Context, p *ChildProcessSpecification) (context.Context, *sync.WaitGroup, *state) {
 	stopCtx, stopCancel := p.Shutdown()
 	baseCtx := ctx
-	baseCtx = context.WithValue(baseCtx, oversightValue("name"), p.Name)
 	baseCtx = context.WithValue(baseCtx, detachableContext, stopCtx.Value(detachableContext))
 	childCtx, childCancel := context.WithCancel(baseCtx)
 	var childWg sync.WaitGroup
@@ -383,14 +380,6 @@ func (t *Tree) plugStop(ctx context.Context, p *ChildProcessSpecification) (cont
 		}
 	})
 	return childCtx, &childWg, childProc.state
-}
-
-// ChildProcessName reports the child process name if available in the context.
-func ChildProcessName(ctx context.Context) string {
-	if v := ctx.Value(oversightValue("name")); v != nil {
-		return v.(string)
-	}
-	return ""
 }
 
 // Terminate stop the named process. Terminated child processes do not count

@@ -931,13 +931,6 @@ func TestWaitAfterStart(t *testing.T) {
 	}
 }
 
-func TestEmptyChildProcessName(t *testing.T) {
-	got := oversight.ChildProcessName(context.Background())
-	if got != "" {
-		t.Fatal("unexpected child process name", got)
-	}
-}
-
 func TestEmptyContextTree(t *testing.T) {
 	var tree oversight.Tree
 	var nilContext context.Context
