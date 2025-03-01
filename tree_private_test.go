@@ -22,25 +22,20 @@ import (
 
 func Test_uniqueName(t *testing.T) {
 	var tree Tree
-	cps := ChildProcessSpecification{
-		Name: "alpha",
-		Fn: func(ctx context.Context) error {
-			return nil
-		},
-		Restart:  Permanent(),
-		Shutdown: Natural(),
+	f := func(ctx context.Context) error {
+		return nil
 	}
-	if err := tree.Add(cps); err != nil {
+	if err := tree.Add(f, Permanent(), Natural(), "alpha"); err != nil {
 		t.Fatal("unexpected error:", err)
 	}
-	if err := tree.Add(cps); !errors.Is(err, ErrNonUniqueProcessName) {
+	if err := tree.Add(f, Permanent(), Natural(), "alpha"); !errors.Is(err, ErrNonUniqueProcessName) {
 		t.Fatal("unexpected error:", err)
 	}
 }
 
 func Test_invalidChildProcessSpecification(t *testing.T) {
 	var tree Tree
-	err := tree.Add(ChildProcessSpecification{})
+	err := tree.Add(nil, Permanent(), Natural(), "alpha")
 	if !errors.Is(err, ErrChildProcessSpecificationMissingStart) {
 		t.Error("invalid child process specification should trigger have triggered a panic")
 	}

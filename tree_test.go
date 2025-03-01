@@ -33,20 +33,18 @@ import (
 func ExampleTree_singlePermanent() {
 	var tree oversight.Tree
 	err := tree.Add(
-		oversight.ChildProcessSpecification{
-			// Name: "child process",
-			Fn: func(ctx context.Context) error {
-				select {
-				case <-ctx.Done():
-					return nil
-				case <-time.After(time.Second):
-					fmt.Println(1)
-				}
+		func(ctx context.Context) error {
+			select {
+			case <-ctx.Done():
 				return nil
-			},
-			Restart:  oversight.Permanent(),
-			Shutdown: oversight.Natural(),
+			case <-time.After(time.Second):
+				fmt.Println(1)
+			}
+			return nil
 		},
+		oversight.Permanent(),
+		oversight.Natural(),
+		"childProcess",
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -69,9 +67,8 @@ func TestTree_childProcessRestarts(t *testing.T) {
 		const expectedRuns = 2
 		totalRuns := 0
 		var tree oversight.Tree
-		tree.Add(oversight.ChildProcessSpecification{
-
-			Fn: func(ctx context.Context) error {
+		tree.Add(
+			func(ctx context.Context) error {
 				select {
 				case <-ctx.Done():
 					return nil
@@ -83,9 +80,10 @@ func TestTree_childProcessRestarts(t *testing.T) {
 				}
 				return errors.New("finished")
 			},
-			Restart:  oversight.Permanent(),
-			Shutdown: oversight.Timeout(5 * time.Second),
-		})
+			oversight.Permanent(),
+			oversight.Timeout(5*time.Second),
+			"permanentProc",
+		)
 		var wg sync.WaitGroup
 		wg.Add(1)
 		go func() {
@@ -108,8 +106,8 @@ func TestTree_childProcessRestarts(t *testing.T) {
 		const expectedRuns = 2
 		totalRuns := 0
 		var tree oversight.Tree
-		err := tree.Add(oversight.ChildProcessSpecification{
-			Fn: func(ctx context.Context) error {
+		err := tree.Add(
+			func(ctx context.Context) error {
 				var err error
 				if totalRuns == 0 {
 					err = errors.New("finished")
@@ -125,9 +123,10 @@ func TestTree_childProcessRestarts(t *testing.T) {
 				}
 				return err
 			},
-			Restart:  oversight.Transient(),
-			Shutdown: oversight.Timeout(5 * time.Second),
-		})
+			oversight.Transient(),
+			oversight.Timeout(5*time.Second),
+			"transientProc",
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -153,8 +152,8 @@ func TestTree_childProcessRestarts(t *testing.T) {
 		const unexpectedRuns = 2
 		totalRuns := 0
 		var tree oversight.Tree
-		err := tree.Add(oversight.ChildProcessSpecification{
-			Fn: func(ctx context.Context) error {
+		err := tree.Add(
+			func(ctx context.Context) error {
 				var err error
 				if totalRuns == 0 {
 					err = errors.New("finished")
@@ -169,21 +168,23 @@ func TestTree_childProcessRestarts(t *testing.T) {
 				}
 				return err
 			},
-			Restart:  oversight.Temporary(),
-			Shutdown: oversight.Timeout(5 * time.Second),
-		})
+			oversight.Temporary(),
+			oversight.Timeout(5*time.Second),
+			"temporaryProc",
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = tree.Add(oversight.ChildProcessSpecification{
-			Restart: oversight.Permanent(),
-			Fn: func(context.Context) error {
+		err = tree.Add(
+			func(context.Context) error {
 				t.Log("ping...")
 				time.Sleep(500 * time.Millisecond)
 				return nil
 			},
-			Shutdown: oversight.Timeout(5 * time.Second),
-		})
+			oversight.Permanent(),
+			oversight.Timeout(5*time.Second),
+			"pingProc",
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -209,10 +210,8 @@ func TestTree_treeRestarts(t *testing.T) {
 		badSiblingRuns := 0
 		goodSiblingRuns := 0
 		tree := oversight.New(oversight.WithSpecification(2, 1*time.Second, oversight.OneForOne()))
-		err := tree.Add(oversight.ChildProcessSpecification{
-			Name:    "first-child",
-			Restart: oversight.Permanent(),
-			Fn: func(ctx context.Context) error {
+		err := tree.Add(
+			func(ctx context.Context) error {
 				t.Log("failed process should always restart...")
 				badSiblingRuns++
 				if badSiblingRuns >= 2 {
@@ -220,22 +219,24 @@ func TestTree_treeRestarts(t *testing.T) {
 				}
 				return errors.New("finished")
 			},
-			Shutdown: oversight.Natural(),
-		})
+			oversight.Permanent(),
+			oversight.Natural(),
+			"first-child",
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = tree.Add(oversight.ChildProcessSpecification{
-			Name:    "second-child",
-			Restart: oversight.Permanent(),
-			Fn: func(ctx context.Context) error {
+		err = tree.Add(
+			func(ctx context.Context) error {
 				t.Log("but sibling must stay untouched")
 				goodSiblingRuns++
 				<-ctx.Done()
 				return nil
 			},
-			Shutdown: oversight.Natural(),
-		})
+			oversight.Permanent(),
+			oversight.Natural(),
+			"second-child",
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -262,10 +263,8 @@ func TestTree_treeRestarts(t *testing.T) {
 		badSiblingRuns := 0
 		goodSiblingRuns := 0
 		tree := oversight.New(oversight.WithSpecification(2, 1*time.Second, oversight.SimpleOneForOne()))
-		err := tree.Add(oversight.ChildProcessSpecification{
-			Name:    "first-child",
-			Restart: oversight.Permanent(),
-			Fn: func(ctx context.Context) error {
+		err := tree.Add(
+			func(ctx context.Context) error {
 				t.Log("failed process should always restart...")
 				badSiblingRuns++
 				if badSiblingRuns >= 2 {
@@ -273,22 +272,24 @@ func TestTree_treeRestarts(t *testing.T) {
 				}
 				return errors.New("finished")
 			},
-			Shutdown: oversight.Natural(),
-		})
+			oversight.Permanent(),
+			oversight.Natural(),
+			"first-child",
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
-		tree.Add(oversight.ChildProcessSpecification{
-			Name:    "second-child",
-			Restart: oversight.Permanent(),
-			Fn: func(ctx context.Context) error {
+		tree.Add(
+			func(ctx context.Context) error {
 				t.Log("but sibling must stay untouched")
 				goodSiblingRuns++
 				<-ctx.Done()
 				return nil
 			},
-			Shutdown: oversight.Natural(),
-		})
+			oversight.Permanent(),
+			oversight.Natural(),
+			"second-child",
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -315,9 +316,8 @@ func TestTree_treeRestarts(t *testing.T) {
 		badSiblingRuns := 0
 		goodSiblingRuns := 0
 		tree := oversight.New(oversight.WithSpecification(2, 1*time.Second, oversight.OneForAll()))
-		err := tree.Add(oversight.ChildProcessSpecification{
-			Restart: oversight.Permanent(),
-			Fn: func(ctx context.Context) error {
+		err := tree.Add(
+			func(ctx context.Context) error {
 				t.Log("failed process should always restart...")
 				badSiblingRuns++
 				if badSiblingRuns >= 2 {
@@ -325,14 +325,15 @@ func TestTree_treeRestarts(t *testing.T) {
 				}
 				return errors.New("finished")
 			},
-			Shutdown: oversight.Natural(),
-		})
+			oversight.Permanent(),
+			oversight.Natural(),
+			"oneForAll",
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = tree.Add(oversight.ChildProcessSpecification{
-			Restart: oversight.Permanent(),
-			Fn: func(ctx context.Context) error {
+		err = tree.Add(
+			func(ctx context.Context) error {
 				t.Log("and the sibling must restart too")
 				goodSiblingRuns++
 				select {
@@ -340,8 +341,10 @@ func TestTree_treeRestarts(t *testing.T) {
 				}
 				return nil
 			},
-			Shutdown: oversight.Natural(),
-		})
+			oversight.Permanent(),
+			oversight.Natural(),
+			"oneForAll2",
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -365,9 +368,8 @@ func TestTree_treeRestarts(t *testing.T) {
 		badSiblingRuns := 0
 		goodSiblingRuns := 0
 		tree := oversight.New(oversight.WithSpecification(2, 1*time.Second, oversight.RestForOne()))
-		err := tree.Add(oversight.ChildProcessSpecification{
-			Restart: oversight.Permanent(),
-			Fn: func(ctx context.Context) error {
+		err := tree.Add(
+			func(ctx context.Context) error {
 				t.Log("first sibling should never die")
 				firstSiblingRuns++
 				select {
@@ -375,14 +377,15 @@ func TestTree_treeRestarts(t *testing.T) {
 				}
 				return nil
 			},
-			Shutdown: oversight.Natural(),
-		})
+			oversight.Permanent(),
+			oversight.Natural(),
+			"restForOne",
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = tree.Add(oversight.ChildProcessSpecification{
-			Restart: oversight.Permanent(),
-			Fn: func(ctx context.Context) error {
+		err = tree.Add(
+			func(ctx context.Context) error {
 				t.Log("failed process should always restart...")
 				badSiblingRuns++
 				if badSiblingRuns >= 2 {
@@ -390,14 +393,15 @@ func TestTree_treeRestarts(t *testing.T) {
 				}
 				return errors.New("finished")
 			},
-			Shutdown: oversight.Natural(),
-		})
+			oversight.Permanent(),
+			oversight.Natural(),
+			"restForOne2",
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = tree.Add(oversight.ChildProcessSpecification{
-			Restart: oversight.Permanent(),
-			Fn: func(ctx context.Context) error {
+		err = tree.Add(
+			func(ctx context.Context) error {
 				t.Log("and the younger siblings too")
 				goodSiblingRuns++
 				select {
@@ -405,8 +409,10 @@ func TestTree_treeRestarts(t *testing.T) {
 				}
 				return nil
 			},
-			Shutdown: oversight.Natural(),
-		})
+			oversight.Permanent(),
+			oversight.Natural(),
+			"restForOne3",
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -439,10 +445,8 @@ func Test_nestedTree(t *testing.T) {
 		leafCount = 0
 	)
 	var leaf oversight.Tree
-	leaf.Add(oversight.ChildProcessSpecification{
-		Restart:  oversight.Permanent(),
-		Shutdown: oversight.Natural(),
-		Fn: func(ctx context.Context) error {
+	leaf.Add(
+		func(ctx context.Context) error {
 			for {
 				select {
 				case <-ctx.Done():
@@ -454,21 +458,18 @@ func Test_nestedTree(t *testing.T) {
 				}
 			}
 		},
-	})
+		oversight.Permanent(),
+		oversight.Natural(),
+		"nestedTree",
+	)
 	var (
 		rootMu    sync.Mutex
 		rootCount = 0
 	)
 	var root oversight.Tree
-	root.Add(oversight.ChildProcessSpecification{
-		Restart:  oversight.Permanent(),
-		Fn:       leaf.Start,
-		Shutdown: oversight.Natural(),
-	})
-	root.Add(oversight.ChildProcessSpecification{
-		Restart:  oversight.Permanent(),
-		Shutdown: oversight.Natural(),
-		Fn: func(ctx context.Context) error {
+	root.Add(leaf.Start, oversight.Permanent(), oversight.Natural(), "leaf")
+	root.Add(
+		func(ctx context.Context) error {
 			select {
 			case <-ctx.Done():
 				return nil
@@ -479,7 +480,10 @@ func Test_nestedTree(t *testing.T) {
 			}
 			return nil
 		},
-	})
+		oversight.Permanent(),
+		oversight.Natural(),
+		"proc",
+	)
 	ctx := t.Context()
 	root.Start(ctx)
 	leafMu.Lock()
@@ -510,14 +514,15 @@ func Test_dynamicChild(t *testing.T) {
 	}()
 	// proves that the clockwork waits for the first child process.
 	time.Sleep(1 * time.Second)
-	o.Add(oversight.ChildProcessSpecification{
-		Restart:  oversight.Temporary(),
-		Shutdown: oversight.Natural(),
-		Fn: func(context.Context) error {
+	o.Add(
+		func(context.Context) error {
 			tempExecCount++
 			return nil
 		},
-	})
+		oversight.Temporary(),
+		oversight.Natural(),
+		"dynamicChild",
+	)
 	wg.Wait()
 	if tempExecCount == 0 {
 		t.Error("dynamic child process did not start")
@@ -531,14 +536,15 @@ func Test_customLogger(t *testing.T) {
 	var buf bytes.Buffer
 	logger := log.New(&buf, "", 0)
 	tree := oversight.New(oversight.WithLogger(logger))
-	tree.Add(oversight.ChildProcessSpecification{
-		Restart:  oversight.Permanent(),
-		Shutdown: oversight.Natural(),
-		Fn: func(ctx context.Context) error {
+	tree.Add(
+		func(ctx context.Context) error {
 			cancel()
 			return nil
 		},
-	})
+		oversight.Permanent(),
+		oversight.Natural(),
+		"customLogger",
+	)
 	tree.Start(ctx)
 	content := buf.String()
 	expectedLog := strings.Contains(content, "child started") && strings.Contains(content, "child done")
@@ -553,10 +559,8 @@ func Test_childProcTimeout(t *testing.T) {
 	blockedCtx := t.Context()
 	started := make(chan struct{})
 	var tree oversight.Tree
-	err := tree.Add(oversight.ChildProcessSpecification{
-		Name:    "timed out childproc",
-		Restart: oversight.Temporary(),
-		Fn: func(ctx context.Context) error {
+	err := tree.Add(
+		func(ctx context.Context) error {
 			started <- struct{}{}
 			t.Log("started")
 			<-ctx.Done()
@@ -564,8 +568,10 @@ func Test_childProcTimeout(t *testing.T) {
 			<-blockedCtx.Done()
 			return nil
 		},
-		Shutdown: oversight.Timeout(2 * time.Second),
-	})
+		oversight.Temporary(),
+		oversight.Timeout(2*time.Second),
+		"timed out childproc",
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -607,11 +613,8 @@ func Test_terminateChildProc(t *testing.T) {
 		var processTerminated bool
 		processStarted := make(chan struct{})
 		var tree oversight.Tree
-		err := tree.Add(oversight.ChildProcessSpecification{
-			Restart:  oversight.Temporary(),
-			Shutdown: oversight.Natural(),
-			Name:     "alpha",
-			Fn: func(ctx context.Context) error {
+		err := tree.Add(
+			func(ctx context.Context) error {
 				close(processStarted)
 				t.Log("started")
 				defer t.Log("stopped")
@@ -621,7 +624,10 @@ func Test_terminateChildProc(t *testing.T) {
 				}
 				return nil
 			},
-		})
+			oversight.Temporary(),
+			oversight.Natural(),
+			"alpha",
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -655,11 +661,8 @@ func Test_terminateChildProc(t *testing.T) {
 	t.Run("duplicate terminate", func(t *testing.T) {
 		processStarted := make(chan struct{})
 		var tree oversight.Tree
-		err := tree.Add(oversight.ChildProcessSpecification{
-			Restart:  oversight.Temporary(),
-			Shutdown: oversight.Natural(),
-			Name:     "alpha",
-			Fn: func(ctx context.Context) error {
+		err := tree.Add(
+			func(ctx context.Context) error {
 				close(processStarted)
 				t.Log("started")
 				defer t.Log("stopped")
@@ -668,19 +671,22 @@ func Test_terminateChildProc(t *testing.T) {
 				}
 				return nil
 			},
-		})
+			oversight.Temporary(),
+			oversight.Natural(),
+			"alpha",
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = tree.Add(oversight.ChildProcessSpecification{
-			Restart:  oversight.Permanent(),
-			Shutdown: oversight.Natural(),
-			Name:     "beta",
-			Fn: func(ctx context.Context) error {
+		err = tree.Add(
+			func(ctx context.Context) error {
 				<-ctx.Done()
 				return nil
 			},
-		})
+			oversight.Permanent(),
+			oversight.Natural(),
+			"beta",
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -708,11 +714,8 @@ func Test_deleteChildProc(t *testing.T) {
 	t.Parallel()
 	processStarted := make(chan struct{})
 	var tree oversight.Tree
-	err := tree.Add(oversight.ChildProcessSpecification{
-		Restart:  oversight.Temporary(),
-		Shutdown: oversight.Natural(),
-		Name:     "alpha",
-		Fn: func(ctx context.Context) error {
+	err := tree.Add(
+		func(ctx context.Context) error {
 			t.Log("alpha started")
 			defer t.Log("alpha stopped")
 			select {
@@ -720,15 +723,15 @@ func Test_deleteChildProc(t *testing.T) {
 			}
 			return nil
 		},
-	})
+		oversight.Temporary(),
+		oversight.Natural(),
+		"alpha",
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = tree.Add(oversight.ChildProcessSpecification{
-		Restart:  oversight.Temporary(),
-		Shutdown: oversight.Natural(),
-		Name:     "beta",
-		Fn: func(ctx context.Context) error {
+	err = tree.Add(
+		func(ctx context.Context) error {
 			close(processStarted)
 			t.Log("beta started")
 			defer t.Log("beta stopped")
@@ -737,7 +740,10 @@ func Test_deleteChildProc(t *testing.T) {
 			}
 			return nil
 		},
-	})
+		oversight.Temporary(),
+		oversight.Natural(),
+		"beta",
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -769,18 +775,18 @@ func Test_currentChildren(t *testing.T) {
 	t.Parallel()
 	childProcStarted := make(chan struct{})
 	var tree oversight.Tree
-	err := tree.Add(oversight.ChildProcessSpecification{
-		Restart:  oversight.Permanent(),
-		Shutdown: oversight.Natural(),
-		Name:     "alpha",
-		Fn: func(ctx context.Context) error {
+	err := tree.Add(
+		func(ctx context.Context) error {
 			close(childProcStarted)
 			select {
 			case <-ctx.Done():
 			}
 			return nil
 		},
-	})
+		oversight.Permanent(),
+		oversight.Natural(),
+		"alpha",
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -820,24 +826,24 @@ func Test_currentChildren(t *testing.T) {
 func Test_operationsOnDeadTree(t *testing.T) {
 	t.Parallel()
 	var tree oversight.Tree
-	err := tree.Add(oversight.ChildProcessSpecification{
-		Restart:  oversight.Permanent(),
-		Shutdown: oversight.Natural(),
-		Name:     "alpha",
-		Fn:       func(ctx context.Context) error { return nil },
-	})
+	err := tree.Add(
+		func(ctx context.Context) error { return nil },
+		oversight.Permanent(),
+		oversight.Natural(),
+		"alpha",
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	tree.Start(ctx)
-	err = tree.Add(oversight.ChildProcessSpecification{
-		Restart:  oversight.Permanent(),
-		Shutdown: oversight.Natural(),
-		Name:     "beta",
-		Fn:       func(context.Context) error { return nil },
-	})
+	err = tree.Add(
+		func(context.Context) error { return nil },
+		oversight.Permanent(),
+		oversight.Natural(),
+		"beta",
+	)
 	if err != oversight.ErrTreeNotRunning {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -860,7 +866,7 @@ func Test_invalidTreeConfiguration(t *testing.T) {
 		if err := tree.Start(context.Background()); err != oversight.ErrInvalidConfiguration {
 			t.Errorf("unexpected error for an invalid configuration: %v", err)
 		}
-		if err := tree.Add(oversight.ChildProcessSpecification{Fn: func(context.Context) error { return nil }}); err != oversight.ErrTreeNotRunning {
+		if err := tree.Add(func(context.Context) error { return nil }, oversight.Permanent(), oversight.Natural(), "proc"); err != oversight.ErrTreeNotRunning {
 			t.Errorf("unexpected error for an Add() operations on a badly configured tree: %v", err)
 		}
 		if err := tree.Delete("404"); err != oversight.ErrTreeNotRunning {
@@ -875,10 +881,8 @@ func Test_neverHalt(t *testing.T) {
 	defer cancel()
 	restarts := 0
 	tree := oversight.New(oversight.NeverHalt())
-	err := tree.Add(oversight.ChildProcessSpecification{
-		Restart:  oversight.Permanent(),
-		Shutdown: oversight.Natural(),
-		Fn: func(ctx context.Context) error {
+	err := tree.Add(
+		func(ctx context.Context) error {
 			if restarts >= 10 {
 				cancel()
 				return nil
@@ -886,7 +890,10 @@ func Test_neverHalt(t *testing.T) {
 			restarts++
 			return nil
 		},
-	})
+		oversight.Permanent(),
+		oversight.Natural(),
+		"neverHalt",
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -902,10 +909,8 @@ func Test_aliases(t *testing.T) {
 		defer cancel()
 		restarts := 0
 		tree := oversight.New(oversight.DefaultMaximumRestartIntensity())
-		err := tree.Add(oversight.ChildProcessSpecification{
-			Restart:  oversight.Permanent(),
-			Shutdown: oversight.Natural(),
-			Fn: func(ctx context.Context) error {
+		err := tree.Add(
+			func(ctx context.Context) error {
 				if restarts >= 10 {
 					cancel()
 					return nil
@@ -913,7 +918,10 @@ func Test_aliases(t *testing.T) {
 				restarts++
 				return nil
 			},
-		})
+			oversight.Permanent(),
+			oversight.Natural(),
+			"DefaultMaximumRestartIntensityProc",
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -926,10 +934,8 @@ func Test_aliases(t *testing.T) {
 		defer cancel()
 		restarts := 0
 		tree := oversight.New(oversight.WithMaximumRestartIntensity(oversight.DefaultMaxR, oversight.DefaultMaxT))
-		err := tree.Add(oversight.ChildProcessSpecification{
-			Restart:  oversight.Permanent(),
-			Shutdown: oversight.Natural(),
-			Fn: func(ctx context.Context) error {
+		err := tree.Add(
+			func(ctx context.Context) error {
 				if restarts >= 10 {
 					cancel()
 					return nil
@@ -937,7 +943,10 @@ func Test_aliases(t *testing.T) {
 				restarts++
 				return nil
 			},
-		})
+			oversight.Permanent(),
+			oversight.Natural(),
+			"WithRestartIntensityProc",
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -952,14 +961,15 @@ func TestPanicDoubleStart(t *testing.T) {
 	var tree oversight.Tree
 	oversight.NeverHalt()(&tree)
 	ctx, cancel := context.WithCancel(context.Background())
-	err := tree.Add(oversight.ChildProcessSpecification{
-		Restart:  oversight.Permanent(),
-		Shutdown: oversight.Natural(),
-		Name:     "child", Fn: func(context.Context) error {
+	err := tree.Add(
+		func(context.Context) error {
 			cancel()
 			return nil
 		},
-	})
+		oversight.Permanent(),
+		oversight.Natural(),
+		"child",
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -979,17 +989,18 @@ func TestWaitAfterStart(t *testing.T) {
 		mu.Lock()
 		count++
 		mu.Unlock()
-		err := tree.Add(oversight.ChildProcessSpecification{
-			Fn: func(ctx context.Context) error {
+		err := tree.Add(
+			func(ctx context.Context) error {
 				<-ctx.Done()
 				mu.Lock()
 				count--
 				mu.Unlock()
 				return nil
 			},
-			Restart:  oversight.Temporary(),
-			Shutdown: oversight.Natural(),
-		})
+			oversight.Temporary(),
+			oversight.Natural(),
+			fmt.Sprintf("proc-%d", count),
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1027,28 +1038,29 @@ func Test_deleteFinishedTransient(t *testing.T) {
 	)
 	ready := make(chan struct{})
 	cycled := make(chan struct{}, 1)
-	err := tree.Add(oversight.ChildProcessSpecification{
-		Restart:  oversight.Permanent(),
-		Shutdown: oversight.Natural(),
-		Fn: func(ctx context.Context) error {
+	err := tree.Add(
+		func(ctx context.Context) error {
 			<-ctx.Done()
 			cycled <- struct{}{}
 			return nil
 		},
-	})
+		oversight.Permanent(),
+		oversight.Natural(),
+		"finished-permanent",
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = tree.Add(oversight.ChildProcessSpecification{
-		Name:     "failed-transient",
-		Restart:  oversight.Transient(),
-		Shutdown: oversight.Natural(),
-		Fn: func(context.Context) error {
+	err = tree.Add(
+		func(context.Context) error {
 			t.Log("running transient process")
 			defer close(ready)
 			return nil
 		},
-	})
+		oversight.Transient(),
+		oversight.Natural(),
+		"failed-transient",
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1065,25 +1077,23 @@ func Test_deleteFinishedTransient(t *testing.T) {
 
 func Test_badChildProcessSpecification(t *testing.T) {
 	var tree oversight.Tree
-	cps := oversight.ChildProcessSpecification{
-		Name: "alpha",
-	}
-	if err := tree.Add(cps); !errors.Is(err, oversight.ErrChildProcessSpecificationMissingStart) {
+	const procName = "alpha"
+	if err := tree.Add(nil, nil, nil, procName); !errors.Is(err, oversight.ErrChildProcessSpecificationMissingStart) {
 		t.Error("expected error missing:", err)
 	}
-	cps.Fn = func(ctx context.Context) error { return nil }
-	if err := tree.Add(cps); !errors.Is(err, oversight.ErrMissingRestartPolicy) {
+	fn := func(ctx context.Context) error { return nil }
+	if err := tree.Add(fn, nil, nil, procName); !errors.Is(err, oversight.ErrMissingRestartPolicy) {
 		t.Error("expected error missing:", err)
 	}
-	cps.Restart = oversight.Permanent()
-	if err := tree.Add(cps); !errors.Is(err, oversight.ErrMissingShutdownPolicy) {
+	restart := oversight.Permanent()
+	if err := tree.Add(fn, restart, nil, procName); !errors.Is(err, oversight.ErrMissingShutdownPolicy) {
 		t.Error("expected error missing:", err)
 	}
-	cps.Shutdown = oversight.Natural()
-	if err := tree.Add(cps); err != nil {
+	shutdown := oversight.Natural()
+	if err := tree.Add(fn, restart, shutdown, procName); err != nil {
 		t.Error("unexpected error:", err)
 	}
-	if err := tree.Add(cps); !errors.Is(err, oversight.ErrNonUniqueProcessName) {
+	if err := tree.Add(fn, restart, shutdown, procName); !errors.Is(err, oversight.ErrNonUniqueProcessName) {
 		t.Error("expected error missing:", err)
 	}
 }

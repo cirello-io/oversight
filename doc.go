@@ -18,20 +18,18 @@
 //
 //	var tree oversight.Tree
 //	err := tree.Add(
-//		oversight.ChildProcessSpecification{
-//			// Name: "child process",
-//			Start: func(ctx context.Context) error {
-//				select {
-//				case <-ctx.Done():
-//					return nil
-//				case <-time.After(time.Second):
-//					fmt.Println(1)
-//				}
+//		func(ctx context.Context) error {
+//			select {
+//			case <-ctx.Done():
 //				return nil
-//			},
-//			Restart:  oversight.Permanent(),
-//			Shutdown: oversight.Infinity(),
+//			case <-time.After(time.Second):
+//				fmt.Println(1)
+//			}
+//			return nil
 //		},
+//		oversight.Permanent(),
+//		oversight.Natural(),
+//		"childProcess",
 //	)
 //	if err != nil {
 //		log.Fatal(err)

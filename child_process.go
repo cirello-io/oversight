@@ -88,25 +88,25 @@ func (r *state) setFailed() {
 	r.state = Failed
 }
 
-// ChildProcessSpecification provides the complete interface to configure how
+// childProcessSpecification provides the complete interface to configure how
 // the child process should behave itself in case of failures.
-type ChildProcessSpecification struct {
-	// Name is the human-friendly reference used for inspecting and
+type childProcessSpecification struct {
+	// name is the human-friendly reference used for inspecting and
 	// terminating child processes. The name must be unique within the
 	// oversight tree. If left empty, the oversight tree will generate a
 	// unique name.
-	Name string
+	name string
 
-	// Restart must be one of the [Restart] policies.
-	Restart Restart
+	// restart must be one of the [restart] policies.
+	restart Restart
 
-	// Fn initiates the child process in a panic-trapping cage. It does not
+	// fn initiates the child process in a panic-trapping cage. It does not
 	// circumvent Go's panic-recover semantics. Avoid starting goroutines
 	// inside the ChildProcess if they risk panic()'ing.
-	Fn ChildProcess
+	fn ChildProcess
 
-	// Shutdown must be one of the [Shutdown] policies.
-	Shutdown Shutdown
+	// shutdown must be one of the [shutdown] policies.
+	shutdown Shutdown
 }
 
 // ChildProcess is a function that can be restarted

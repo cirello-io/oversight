@@ -70,7 +70,7 @@ var ErrMissingRestartPolicy = errors.New("missing restart policy")
 var ErrMissingShutdownPolicy = errors.New("missing shutdown policy")
 
 type childProcess struct {
-	spec  *ChildProcessSpecification
+	spec  *childProcessSpecification
 	state *state
 }
 
@@ -143,7 +143,7 @@ func (t *Tree) init() {
 // Add attaches a new child process to a running oversight tree.  This call must
 // be used on running oversight trees. If the tree is halted, it is going to
 // fail with ErrTreeNotRunning.
-func (t *Tree) Add(spec ChildProcessSpecification) error {
+func (t *Tree) Add(fn ChildProcess, restart Restart, shutdown Shutdown, name string) error {
 	t.init()
 	if t.err() != nil {
 		return ErrTreeNotRunning
@@ -154,7 +154,12 @@ func (t *Tree) Add(spec ChildProcessSpecification) error {
 	default:
 	}
 	t.semaphore.Lock()
-	err := t.addChildProcessSpecification(spec)
+	err := t.addChildProcessSpecification(childProcessSpecification{
+		name:     name,
+		restart:  restart,
+		shutdown: shutdown,
+		fn:       fn,
+	})
 	t.semaphore.Unlock()
 	go func() { t.processChanged <- struct{}{} }()
 	return err
@@ -303,7 +308,7 @@ func (t *Tree) startChildProcesses(ctx context.Context, cancel context.CancelFun
 		default:
 			anyRunningProcess = true
 			t.anyStartedProcessEver = true
-			t.logger.Printf("starting %v", childProc.spec.Name)
+			t.logger.Printf("starting %v", childProc.spec.name)
 			t.startChildProcess(ctx, childProc.spec, startSemaphore)
 		}
 	}
@@ -324,7 +329,7 @@ func (t *Tree) handleTreeChanges(ctx context.Context, cancel context.CancelFunc)
 	case failedChildName := <-t.failure:
 		t.semaphore.Lock()
 		if childProc, ok := t.children[failedChildName]; ok {
-			t.logger.Printf("child process failure detected (%v)", childProc.spec.Name)
+			t.logger.Printf("child process failure detected (%v)", childProc.spec.name)
 			t.strategy(t, childProc)
 		}
 		t.semaphore.Unlock()
@@ -340,7 +345,7 @@ func (t *Tree) handleTreeChanges(ctx context.Context, cancel context.CancelFunc)
 	}
 }
 
-func (t *Tree) startChildProcess(ctx context.Context, p *ChildProcessSpecification, startSemaphore <-chan struct{}) {
+func (t *Tree) startChildProcess(ctx context.Context, p *childProcessSpecification, startSemaphore <-chan struct{}) {
 	childCtx, childWg, procState := t.plugStop(ctx, p)
 	detachable := childCtx.Value(detachableContext) == true
 	if !detachable {
@@ -352,31 +357,31 @@ func (t *Tree) startChildProcess(ctx context.Context, p *ChildProcessSpecificati
 		}
 		defer childWg.Done()
 		<-startSemaphore
-		t.logger.Println(p.Name, "child started")
-		defer t.logger.Println(p.Name, "child done")
-		err := safeRun(childCtx, p.Fn)
+		t.logger.Println(p.name, "child started")
+		defer t.logger.Println(p.name, "child done")
+		err := safeRun(childCtx, p.fn)
 		if err != nil {
-			t.logger.Println(p.Name, "errored:", err)
+			t.logger.Println(p.name, "errored:", err)
 		}
-		restart := p.Restart(err)
+		restart := p.restart(err)
 		procState.setErr(err, restart)
 		select {
 		case <-childCtx.Done():
-		case t.failure <- p.Name:
+		case t.failure <- p.name:
 		}
 	}()
 }
 
-func (t *Tree) plugStop(ctx context.Context, p *ChildProcessSpecification) (context.Context, *sync.WaitGroup, *state) {
-	stopCtx, stopCancel := p.Shutdown()
+func (t *Tree) plugStop(ctx context.Context, p *childProcessSpecification) (context.Context, *sync.WaitGroup, *state) {
+	stopCtx, stopCancel := p.shutdown()
 	baseCtx := ctx
 	baseCtx = context.WithValue(baseCtx, detachableContext, stopCtx.Value(detachableContext))
 	childCtx, childCancel := context.WithCancel(baseCtx)
 	var childWg sync.WaitGroup
 	childWg.Add(1)
-	childProc := t.children[p.Name]
+	childProc := t.children[p.name]
 	childProc.state.setRunning(func() {
-		t.logger.Println(p.Name, "stopping")
+		t.logger.Println(p.name, "stopping")
 		defer stopCancel()
 		wgComplete := make(chan struct{})
 		childCancel()
@@ -386,9 +391,9 @@ func (t *Tree) plugStop(ctx context.Context, p *ChildProcessSpecification) (cont
 		}()
 		select {
 		case <-wgComplete:
-			t.logger.Println(p.Name, "stopped")
+			t.logger.Println(p.name, "stopped")
 		case <-stopCtx.Done():
-			t.logger.Println(p.Name, "timeout")
+			t.logger.Println(p.name, "timeout")
 		}
 	})
 	return childCtx, &childWg, childProc.state
@@ -452,7 +457,7 @@ func (t *Tree) Delete(name string) error {
 
 func (t *Tree) deleteChildByName(name string) {
 	t.childrenOrder = slices.DeleteFunc(t.childrenOrder, func(cp *childProcess) bool {
-		return cp.spec.Name == name
+		return cp.spec.name == name
 	})
 	delete(t.children, name)
 }
@@ -464,7 +469,7 @@ func (t *Tree) Children() []State {
 	defer t.semaphore.Unlock()
 	ret := []State{}
 	for _, childProc := range t.childrenOrder {
-		childProcName := childProc.spec.Name
+		childProcName := childProc.spec.name
 		childProcState := childProc.state
 		childProcState.mu.Lock()
 		ret = append(ret, State{
@@ -490,21 +495,21 @@ func (t *Tree) setErr(err error) {
 	t.errorMu.Unlock()
 }
 
-func (t *Tree) addChildProcessSpecification(spec ChildProcessSpecification) error {
-	if spec.Fn == nil {
+func (t *Tree) addChildProcessSpecification(spec childProcessSpecification) error {
+	if spec.fn == nil {
 		return ErrChildProcessSpecificationMissingStart
 	}
-	if spec.Name == "" {
+	if spec.name == "" {
 		id := rand.Int63()
-		spec.Name = fmt.Sprintf("childproc %d", id)
+		spec.name = fmt.Sprintf("childproc %d", id)
 	}
-	if _, ok := t.children[spec.Name]; ok {
+	if _, ok := t.children[spec.name]; ok {
 		return ErrNonUniqueProcessName
 	}
-	if spec.Restart == nil {
+	if spec.restart == nil {
 		return ErrMissingRestartPolicy
 	}
-	if spec.Shutdown == nil {
+	if spec.shutdown == nil {
 		return ErrMissingShutdownPolicy
 	}
 	cp := &childProcess{
@@ -515,7 +520,7 @@ func (t *Tree) addChildProcessSpecification(spec ChildProcessSpecification) erro
 		},
 		spec: &spec,
 	}
-	t.children[spec.Name] = cp
+	t.children[spec.name] = cp
 	t.childrenOrder = append(t.childrenOrder, cp)
 	return nil
 }
