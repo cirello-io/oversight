@@ -14,21 +14,27 @@ https://godoc.org/cirello.io/oversight/v2
 
 ## Quickstart
 ```
-supervise := oversight.New(
-	oversight.Processes(func(ctx context.Context) error {
-		select {
-		case <-ctx.Done():
+var tree oversight.Tree
+err := tree.Add(
+	oversight.ChildProcessSpecification{
+		// Name: "child process",
+		Start: func(ctx context.Context) error {
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-time.After(time.Second):
+				fmt.Println(1)
+			}
 			return nil
-		case <-time.After(time.Second):
-			log.Println(1)
-		}
-		return nil
-	}),
+		},
+		Restart:  oversight.Permanent(),
+		Shutdown: oversight.Infinity(),
+	},
 )
-
-ctx, cancel := context.WithCancel(context.Background())
-defer cancel()
-if err := supervise.Start(ctx); err != nil {
+if err != nil {
 	log.Fatal(err)
 }
+ctx, cancel := context.WithCancel(context.Background())
+defer cancel()
+fmt.Println(tree.Start(ctx))
 ```

@@ -32,21 +32,28 @@ import (
 // child processes.
 func ExampleTree_singlePermanent() {
 	var tree oversight.Tree
-	tree.Add(oversight.ChildProcessSpecification{Start: func(ctx context.Context) error {
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-time.After(time.Second):
-			fmt.Println(1)
-		}
-		return nil
-	}})
+	err := tree.Add(
+		oversight.ChildProcessSpecification{
+			// Name: "child process",
+			Start: func(ctx context.Context) error {
+				select {
+				case <-ctx.Done():
+					return nil
+				case <-time.After(time.Second):
+					fmt.Println(1)
+				}
+				return nil
+			},
+			Restart:  oversight.Permanent(),
+			Shutdown: oversight.Infinity(),
+		},
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	err := tree.Start(ctx)
-	if err != nil {
-		fmt.Println(err)
-	}
+	fmt.Println(tree.Start(ctx))
 
 	// Output:
 	// 1
