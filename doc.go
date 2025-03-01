@@ -41,24 +41,5 @@
 //	defer cancel()
 //	fmt.Println(tree.Start(ctx))
 //
-// # Simple interface
-//
-// If you do not need to use nested trees, you might prefer using
-// cirello.io/oversight/v2/easy instead. It provides a OneForAll tree with the
-// automatic halting disabled.
-//
-//	package main
-//
-//	import oversight "cirello.io/oversight/v2/easy"
-//
-//	func main() {
-//		ctx, cancel := context.WithCancel(context.Background())
-//		defer cancel() // use cancel() to halt the tree.
-//		ctx = oversight.WithContext(ctx)
-//		oversight.Add(ctx, func(ctx context.Context) {
-//			// ...
-//		})
-//	}
-//
 // Security Notice: there has been permanent attempts to use the name of this package to spread malware. Please refer to https://github.com/cirello-io/oversight/issues/3 for more information.
 package oversight // import "cirello.io/oversight/v2"
