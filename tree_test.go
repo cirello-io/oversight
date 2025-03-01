@@ -662,7 +662,7 @@ func Test_terminateChildProc(t *testing.T) {
 			t.Fatalf("termination call failed: %v", err)
 		}
 		t.Log("alpha terminated")
-		if err := tree.Terminate("alpha"); err == nil {
+		if err := tree.Terminate("alpha"); !errors.Is(err, oversight.ErrProcessNotRunning) {
 			t.Fatalf("termination call should have failed: %v", err)
 		} else {
 			t.Log("alpha terminated again:", err)
