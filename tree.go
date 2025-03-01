@@ -57,6 +57,18 @@ var ErrMissingContext = errors.New("missing context")
 // specification is missing the start function.
 var ErrChildProcessSpecificationMissingStart = errors.New("missing start function in child process specification")
 
+// ErrNonUniqueProcessName is returned when a child process is added with a name
+// that is already in use.
+var ErrNonUniqueProcessName = errors.New("non-unique process name")
+
+// ErrMissingRestartPolicy is returned when a child process specification is
+// missing the [Restart] policy.
+var ErrMissingRestartPolicy = errors.New("missing restart policy")
+
+// ErrMissingShutdownPolicy is returned when a child process specification is
+// missing the [Shutdown] policy.
+var ErrMissingShutdownPolicy = errors.New("missing shutdown policy")
+
 type childProcess struct {
 	spec  *ChildProcessSpecification
 	state *state
@@ -342,7 +354,7 @@ func (t *Tree) startChildProcess(ctx context.Context, p *ChildProcessSpecificati
 		<-startSemaphore
 		t.logger.Println(p.Name, "child started")
 		defer t.logger.Println(p.Name, "child done")
-		err := safeRun(childCtx, p.Start)
+		err := safeRun(childCtx, p.Fn)
 		if err != nil {
 			t.logger.Println(p.Name, "errored:", err)
 		}
@@ -479,7 +491,7 @@ func (t *Tree) setErr(err error) {
 }
 
 func (t *Tree) addChildProcessSpecification(spec ChildProcessSpecification) error {
-	if spec.Start == nil {
+	if spec.Fn == nil {
 		return ErrChildProcessSpecificationMissingStart
 	}
 	if spec.Name == "" {
@@ -487,14 +499,13 @@ func (t *Tree) addChildProcessSpecification(spec ChildProcessSpecification) erro
 		spec.Name = fmt.Sprintf("childproc %d", id)
 	}
 	if _, ok := t.children[spec.Name]; ok {
-		id := rand.Int63()
-		spec.Name += fmt.Sprint(" ", id)
+		return ErrNonUniqueProcessName
 	}
 	if spec.Restart == nil {
-		spec.Restart = Permanent()
+		return ErrMissingRestartPolicy
 	}
 	if spec.Shutdown == nil {
-		spec.Shutdown = Timeout(DefaultChildProcessTimeout)
+		return ErrMissingShutdownPolicy
 	}
 	cp := &childProcess{
 		state: &state{

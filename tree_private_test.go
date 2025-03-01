@@ -22,18 +22,19 @@ import (
 
 func Test_uniqueName(t *testing.T) {
 	var tree Tree
-	if err := tree.Add(ChildProcessSpecification{Name: "alpha", Start: func(ctx context.Context) error { return nil }}); err != nil {
+	cps := ChildProcessSpecification{
+		Name: "alpha",
+		Fn: func(ctx context.Context) error {
+			return nil
+		},
+		Restart:  Permanent(),
+		Shutdown: Natural(),
+	}
+	if err := tree.Add(cps); err != nil {
 		t.Fatal("unexpected error:", err)
 	}
-	if err := tree.Add(ChildProcessSpecification{Name: "alpha", Start: func(ctx context.Context) error { return nil }}); err != nil {
+	if err := tree.Add(cps); !errors.Is(err, ErrNonUniqueProcessName) {
 		t.Fatal("unexpected error:", err)
-	}
-
-	seenNames := make(map[string]struct{})
-	for _, p := range tree.children {
-		if _, ok := seenNames[p.spec.Name]; ok {
-			t.Fatal("unique process name logic has failed")
-		}
 	}
 }
 

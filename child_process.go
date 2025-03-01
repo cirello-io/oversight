@@ -92,22 +92,20 @@ func (r *state) setFailed() {
 // the child process should behave itself in case of failures.
 type ChildProcessSpecification struct {
 	// Name is the human-friendly reference used for inspecting and
-	// terminating child processes. If the same named is used twice, the
-	// oversight tree will append a suffix to make it unique.
+	// terminating child processes. The name must be unique within the
+	// oversight tree. If left empty, the oversight tree will generate a
+	// unique name.
 	Name string
 
-	// Restart must be one of the Restart policies. The each oversight tree
-	// implementation is free to interpret the result of this call.
+	// Restart must be one of the [Restart] policies.
 	Restart Restart
 
-	// Start initiates the child process in a panic-trapping cage. It does
-	// not circumvent Go's panic-recover semantics. Avoid starting
-	// goroutines inside the ChildProcess if they risk panic()'ing.
-	Start ChildProcess
+	// Fn initiates the child process in a panic-trapping cage. It does not
+	// circumvent Go's panic-recover semantics. Avoid starting goroutines
+	// inside the ChildProcess if they risk panic()'ing.
+	Fn ChildProcess
 
-	// Shutdown defines the child process timeout. If the process is not
-	// stopped within the specified duration, the oversight tree detached
-	// the process and moves on. Null values mean wait forever.
+	// Shutdown must be one of the [Shutdown] policies.
 	Shutdown Shutdown
 }
 
@@ -138,17 +136,13 @@ type shutdownContextValue string
 
 var detachableContext = shutdownContextValue("detachable")
 
-// Infinity will wait until the process naturally dies.
-func Infinity() Shutdown {
+// Natural will wait until the process naturally dies.
+func Natural() Shutdown {
 	return func() (context.Context, context.CancelFunc) {
 		ctx := context.WithValue(context.Background(), detachableContext, false)
 		return context.WithCancel(ctx)
 	}
 }
-
-// DefaultChildProcessTimeout defines how long child worker process should wait
-// before detachment.
-const DefaultChildProcessTimeout = 5 * time.Second
 
 // Timeout defines a duration of time that the oversight will wait before
 // detaching from the winding process.
