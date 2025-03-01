@@ -8,7 +8,7 @@ Refer to: http://erlang.org/doc/design_principles/sup_princ.html
 
 go get cirello.io/oversight/v2
 
-https://godoc.org/cirello.io/oversight/v2
+https://pkg.go.dev/cirello.io/oversight/v2
 
 
 ## Quickstart
