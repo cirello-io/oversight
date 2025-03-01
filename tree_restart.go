@@ -18,13 +18,15 @@ import (
 	"time"
 )
 
-type restart struct {
+// treeRestart decides if an oversight tree should give up and tear itself down
+// due to too many restarts in a given period of time.
+type treeRestart struct {
 	intensity int
 	period    time.Duration
 	restarts  []time.Time
 }
 
-func (r *restart) shouldTerminate(now time.Time) bool {
+func (r *treeRestart) shouldTerminate(now time.Time) bool {
 	if r.intensity == -1 {
 		return false
 	}

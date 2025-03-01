@@ -22,7 +22,7 @@ import (
 
 func Test_restart_terminate(t *testing.T) {
 	now := time.Now()
-	r := &restart{
+	r := &treeRestart{
 		intensity: 1,
 		period:    5 * time.Second,
 	}

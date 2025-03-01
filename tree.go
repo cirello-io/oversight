@@ -98,7 +98,7 @@ type Tree struct {
 	// internal loop management variables
 	failure               chan string // child process name
 	anyStartedProcessEver bool
-	restarter             *restart
+	restarter             *treeRestart
 }
 
 // New creates a new oversight (supervisor) tree with the applied options.
@@ -133,7 +133,7 @@ func (t *Tree) init() {
 		t.children = make(map[string]*childProcess)
 		t.stopped = make(chan struct{})
 		t.failure = make(chan string)
-		t.restarter = &restart{
+		t.restarter = &treeRestart{
 			intensity: t.maxR,
 			period:    t.maxT,
 		}
