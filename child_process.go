@@ -111,7 +111,7 @@ type ChildProcessSpecification struct {
 	Shutdown Shutdown
 }
 
-// ChildProcess is a function that can be supervised for restart.
+// ChildProcess is a function that can be restarted
 type ChildProcess func(ctx context.Context) error
 
 // Restart is a function that decides if a worker has to be restarted or not

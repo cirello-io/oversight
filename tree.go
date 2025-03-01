@@ -382,12 +382,12 @@ func (t *Tree) plugStop(ctx context.Context, p *ChildProcessSpecification) (cont
 	return childCtx, &childWg, childProc.state
 }
 
-// Terminate stop the named process. Terminated child processes do not count
-// as failures in the oversight tree restart policy. If the oversight tree runs
-// out of processes to supervise, it will terminate itself with
-// ErrNoChildProcessLeft. This call must be used on running oversight trees, if
-// the tree is not started yet, it is going to block. If the tree is halted, it
-// is going to fail with ErrTreeNotRunning.
+// Terminate stop the named process. Terminated child processes do not count as
+// failures in the oversight tree restart policy. If the oversight tree runs out
+// of processes, it will terminate itself with ErrNoChildProcessLeft. This call
+// must be used on running oversight trees, if the tree is not started yet, it
+// is going to block. If the tree is halted, it is going to fail with
+// ErrTreeNotRunning.
 func (t *Tree) Terminate(name string) error {
 	t.init()
 	if err := t.err(); err != nil {
@@ -424,10 +424,10 @@ func (t *Tree) Terminate(name string) error {
 }
 
 // Delete stops the service in the oversight tree and remove from it. If the
-// oversight tree runs out of processes to supervise, it will terminate itself
-// with ErrNoChildProcessLeft. This call must be used on running oversight
-// trees, if the tree is not started yet, it is going to block. If the tree is
-// halted, it is going to fail with ErrTreeNotRunning.
+// oversight tree runs out of processes, it will terminate itself with
+// ErrNoChildProcessLeft. This call must be used on running oversight trees, if
+// the tree is not started yet, it is going to block. If the tree is halted, it
+// is going to fail with ErrTreeNotRunning.
 func (t *Tree) Delete(name string) error {
 	if err := t.Terminate(name); err != nil && !errors.Is(err, ErrProcessNotRunning) {
 		return err
