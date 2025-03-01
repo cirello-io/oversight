@@ -87,7 +87,6 @@ type Tree struct {
 	failure               chan string // child process name
 	anyStartedProcessEver bool
 	restarter             *restart
-	gracefulCancel        context.CancelFunc
 }
 
 // New creates a new oversight (supervisor) tree with the applied options.
@@ -243,7 +242,6 @@ func (t *Tree) Start(rootCtx context.Context) error {
 	defer t.childrenWaitGroup.Wait()
 	ctx, cancel := context.WithCancel(rootCtx)
 	defer cancel()
-	t.gracefulCancel = cancel
 	for {
 		if ctx.Err() != nil {
 			return t.drain()
@@ -476,49 +474,6 @@ func (t *Tree) Children() []State {
 		childProcState.mu.Unlock()
 	}
 	return ret
-}
-
-// GracefulShutdown stops the tree in reverse order. If the tree is not started,
-// it returns ErrTreeNotRunning. If the given context is canceled, the shutdown
-// is aborted.
-func (t *Tree) GracefulShutdown(ctx context.Context) error {
-	if ctx == nil {
-		return ErrMissingContext
-	}
-	if t.gracefulCancel == nil {
-		return ErrTreeNotRunning
-	}
-	t.init()
-	if err := t.err(); err != nil {
-		return ErrTreeNotRunning
-	}
-	select {
-	case <-t.stopped:
-		return ErrTreeNotRunning
-	default:
-	}
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		t.semaphore.Lock()
-		defer t.semaphore.Unlock()
-		for i := len(t.childrenOrder) - 1; i >= 0; i-- {
-			if ctx.Err() != nil {
-				break
-			}
-			proc := t.childrenOrder[i]
-			proc.state.setFailed()
-			proc.state.stop()
-		}
-	}()
-	select {
-	case <-ctx.Done():
-		t.gracefulCancel()
-		return ctx.Err()
-	case <-done:
-		t.gracefulCancel()
-		return nil
-	}
 }
 
 func (t *Tree) err() error {
