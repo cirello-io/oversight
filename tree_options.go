@@ -81,10 +81,7 @@ func DefaultRestartStrategy() TreeOption {
 
 // Logger defines the interface for any logging facility to be compatible with
 // oversight trees.
-type Logger interface {
-	Printf(format string, args ...any)
-	Println(args ...any)
-}
+type Logger func(args ...any)
 
 // WithLogger plugs a custom logger to the oversight tree. It assumes the logger
 // is thread-safe.

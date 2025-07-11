@@ -18,8 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"log"
 	"math/rand"
 	"slices"
 	"sync"
@@ -128,7 +126,7 @@ func (t *Tree) init() {
 			DefaultRestartStrategy()(t)
 		}
 		if t.logger == nil {
-			t.logger = log.New(io.Discard, "", 0)
+			t.logger = func(args ...any) {}
 		}
 		t.children = make(map[string]*childProcess)
 		t.stopped = make(chan struct{})
@@ -275,8 +273,8 @@ func (t *Tree) drain() error {
 	default:
 	}
 	close(t.stopped)
-	defer t.logger.Printf("clean up complete")
-	t.logger.Printf("draining")
+	defer t.logger("clean up complete")
+	t.logger("draining")
 	t.semaphore.Lock()
 	for i := len(t.childrenOrder) - 1; i >= 0; i-- {
 		proc := t.childrenOrder[i]
@@ -308,14 +306,14 @@ func (t *Tree) startChildProcesses(ctx context.Context, cancel context.CancelFun
 		default:
 			anyRunningProcess = true
 			t.anyStartedProcessEver = true
-			t.logger.Printf("starting %v", childProc.spec.name)
+			t.logger("starting", childProc.spec.name)
 			t.startChildProcess(ctx, childProc.spec, startSemaphore)
 		}
 	}
 	close(startSemaphore)
 	t.semaphore.Unlock()
 	if !anyRunningProcess && t.anyStartedProcessEver {
-		t.logger.Printf("no child process left after start")
+		t.logger("no child process left after start")
 		t.setErr(ErrNoChildProcessLeft)
 		cancel()
 	}
@@ -325,20 +323,20 @@ func (t *Tree) handleTreeChanges(ctx context.Context, cancel context.CancelFunc)
 	select {
 	case <-ctx.Done():
 	case <-t.processChanged:
-		t.logger.Println("detected change in child processes list")
+		t.logger("detected change in child processes list")
 	case failedChildName := <-t.failure:
 		t.semaphore.Lock()
 		if childProc, ok := t.children[failedChildName]; ok {
-			t.logger.Printf("child process failure detected (%v)", childProc.spec.name)
+			t.logger("child process failure detected", childProc.spec.name)
 			t.strategy(t, childProc)
 		}
 		t.semaphore.Unlock()
 		if !t.restarter.shouldTerminate(time.Now()) {
 			return
 		}
-		t.logger.Printf("too many failures detected:")
+		t.logger("too many failures detected:")
 		for _, restart := range t.restarter.restarts {
-			t.logger.Println("-", restart)
+			t.logger("-", restart)
 		}
 		t.setErr(ErrTooManyFailures)
 		cancel()
@@ -357,11 +355,11 @@ func (t *Tree) startChildProcess(ctx context.Context, p *childProcessSpecificati
 		}
 		defer childWg.Done()
 		<-startSemaphore
-		t.logger.Println(p.name, "child started")
-		defer t.logger.Println(p.name, "child done")
+		t.logger(p.name, "child started")
+		defer t.logger(p.name, "child done")
 		err := safeRun(childCtx, p.fn)
 		if err != nil {
-			t.logger.Println(p.name, "errored:", err)
+			t.logger(p.name, "errored:", err)
 		}
 		restart := p.restart(err)
 		procState.setErr(err, restart)
@@ -381,7 +379,7 @@ func (t *Tree) plugStop(ctx context.Context, p *childProcessSpecification) (cont
 	childWg.Add(1)
 	childProc := t.children[p.name]
 	childProc.state.setRunning(func() {
-		t.logger.Println(p.name, "stopping")
+		t.logger(p.name, "stopping")
 		defer stopCancel()
 		wgComplete := make(chan struct{})
 		childCancel()
@@ -391,9 +389,9 @@ func (t *Tree) plugStop(ctx context.Context, p *childProcessSpecification) (cont
 		}()
 		select {
 		case <-wgComplete:
-			t.logger.Println(p.name, "stopped")
+			t.logger(p.name, "stopped")
 		case <-stopCtx.Done():
-			t.logger.Println(p.name, "timeout")
+			t.logger(p.name, "timeout")
 		}
 	})
 	return childCtx, &childWg, childProc.state
@@ -434,9 +432,9 @@ func (t *Tree) Terminate(name string) error {
 	procState.mu.Unlock()
 	t.semaphore.Unlock()
 	stop()
-	t.logger.Println("Terminate.processChanged start")
+	t.logger("Terminate.processChanged start")
 	t.processChanged <- struct{}{}
-	t.logger.Println("Terminate.processChanged end")
+	t.logger("Terminate.processChanged end")
 	return nil
 }
 
@@ -515,7 +513,7 @@ func (t *Tree) addChildProcessSpecification(spec childProcessSpecification) erro
 	cp := &childProcess{
 		state: &state{
 			stop: func() {
-				t.logger.Println("stopped before start")
+				t.logger("stopped before start")
 			},
 		},
 		spec: &spec,

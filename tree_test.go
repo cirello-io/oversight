@@ -529,7 +529,7 @@ func Test_customLogger(t *testing.T) {
 	defer cancel()
 	var buf bytes.Buffer
 	logger := log.New(&buf, "", 0)
-	tree := oversight.New(oversight.WithLogger(logger))
+	tree := oversight.New(oversight.WithLogger(logger.Println))
 	tree.Add(
 		func(ctx context.Context) error {
 			cancel()
