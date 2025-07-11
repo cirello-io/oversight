@@ -336,9 +336,7 @@ func TestTree_treeRestarts(t *testing.T) {
 			func(ctx context.Context) error {
 				t.Log("and the sibling must restart too")
 				goodSiblingRuns++
-				select {
-				case <-ctx.Done():
-				}
+				<-ctx.Done()
 				return nil
 			},
 			oversight.Permanent(),
@@ -372,9 +370,7 @@ func TestTree_treeRestarts(t *testing.T) {
 			func(ctx context.Context) error {
 				t.Log("first sibling should never die")
 				firstSiblingRuns++
-				select {
-				case <-ctx.Done():
-				}
+				<-ctx.Done()
 				return nil
 			},
 			oversight.Permanent(),
@@ -404,9 +400,7 @@ func TestTree_treeRestarts(t *testing.T) {
 			func(ctx context.Context) error {
 				t.Log("and the younger siblings too")
 				goodSiblingRuns++
-				select {
-				case <-ctx.Done():
-				}
+				<-ctx.Done()
 				return nil
 			},
 			oversight.Permanent(),
@@ -618,10 +612,8 @@ func Test_terminateChildProc(t *testing.T) {
 				close(processStarted)
 				t.Log("started")
 				defer t.Log("stopped")
-				select {
-				case <-ctx.Done():
-					processTerminated = true
-				}
+				<-ctx.Done()
+				processTerminated = true
 				return nil
 			},
 			oversight.Temporary(),
@@ -666,9 +658,7 @@ func Test_terminateChildProc(t *testing.T) {
 				close(processStarted)
 				t.Log("started")
 				defer t.Log("stopped")
-				select {
-				case <-ctx.Done():
-				}
+				<-ctx.Done()
 				return nil
 			},
 			oversight.Temporary(),
@@ -718,9 +708,7 @@ func Test_deleteChildProc(t *testing.T) {
 		func(ctx context.Context) error {
 			t.Log("alpha started")
 			defer t.Log("alpha stopped")
-			select {
-			case <-ctx.Done():
-			}
+			<-ctx.Done()
 			return nil
 		},
 		oversight.Temporary(),
@@ -735,9 +723,7 @@ func Test_deleteChildProc(t *testing.T) {
 			close(processStarted)
 			t.Log("beta started")
 			defer t.Log("beta stopped")
-			select {
-			case <-ctx.Done():
-			}
+			<-ctx.Done()
 			return nil
 		},
 		oversight.Temporary(),
@@ -778,9 +764,7 @@ func Test_currentChildren(t *testing.T) {
 	err := tree.Add(
 		func(ctx context.Context) error {
 			close(childProcStarted)
-			select {
-			case <-ctx.Done():
-			}
+			<-ctx.Done()
 			return nil
 		},
 		oversight.Permanent(),
