@@ -53,7 +53,6 @@ type State struct {
 type state struct {
 	mu    sync.Mutex
 	state ChildProcessState
-	err   error
 	stop  func()
 }
 
@@ -70,10 +69,9 @@ func (r *state) setRunning(stop func()) {
 	r.stop = stop
 }
 
-func (r *state) setErr(err error, restart bool) {
+func (r *state) shouldRestart(restart bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.err = err
 	if !restart {
 		r.state = Done
 	}

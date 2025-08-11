@@ -362,7 +362,7 @@ func (t *Tree) startChildProcess(ctx context.Context, p *childProcessSpecificati
 			t.logger(p.name, "errored:", err)
 		}
 		restart := p.restart(err)
-		procState.setErr(err, restart)
+		procState.shouldRestart(restart)
 		select {
 		case <-childCtx.Done():
 		case t.failure <- p.name:
