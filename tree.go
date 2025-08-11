@@ -94,7 +94,7 @@ type Tree struct {
 	error   error
 
 	// internal loop management variables
-	failure               chan string // child process name
+	endedProcs            chan string // child process name
 	anyStartedProcessEver bool
 	restarter             *treeRestart
 }
@@ -130,7 +130,7 @@ func (t *Tree) init() {
 		}
 		t.children = make(map[string]*childProcess)
 		t.stopped = make(chan struct{})
-		t.failure = make(chan string)
+		t.endedProcs = make(chan string)
 		t.restarter = &treeRestart{
 			intensity: t.maxR,
 			period:    t.maxT,
@@ -324,9 +324,9 @@ func (t *Tree) handleTreeChanges(ctx context.Context, cancel context.CancelFunc)
 	case <-ctx.Done():
 	case <-t.processChanged:
 		t.logger("detected change in child processes list")
-	case failedChildName := <-t.failure:
+	case endedProcName := <-t.endedProcs:
 		t.semaphore.Lock()
-		if childProc, ok := t.children[failedChildName]; ok {
+		if childProc, ok := t.children[endedProcName]; ok {
 			t.strategy(t, childProc)
 		}
 		t.semaphore.Unlock()
@@ -364,7 +364,7 @@ func (t *Tree) startChildProcess(ctx context.Context, p *childProcessSpecificati
 		procState.shouldRestart(restart)
 		select {
 		case <-childCtx.Done():
-		case t.failure <- p.name:
+		case t.endedProcs <- p.name:
 		}
 	}()
 }
