@@ -327,7 +327,6 @@ func (t *Tree) handleTreeChanges(ctx context.Context, cancel context.CancelFunc)
 	case failedChildName := <-t.failure:
 		t.semaphore.Lock()
 		if childProc, ok := t.children[failedChildName]; ok {
-			t.logger("child process failure detected", childProc.spec.name)
 			t.strategy(t, childProc)
 		}
 		t.semaphore.Unlock()
